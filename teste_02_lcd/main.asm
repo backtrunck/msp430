@@ -48,7 +48,9 @@
 ;-------------------------------------------------------------------------------
 			.data
 
-NUMEROS		.word 0x28FC,0x2060,0x00DB,0x00F3,0x0067,0x00B7,0x00BF,0x00E4,0x00FF,0x00F7 			;Digitos de "0" a "9"
+NUMEROS		.word 0x28FC, 0x2060, 0x00DB, 0x00F3, 0x0067, 0x00B7, 0x00BF, 0x00E4, 0x00FF, 0x00F7			;Digitos de "0" a "9"
+MAIUSCULAS	.word 0x00EF, 0x50F1, 0x009C, 0x50F0, 0x009F, 0x008F, 0x00BD, 0x006F, 0x5090, 0x0078, 0x220E, 0x001C, 0xA06C
+			.word 0x826C, 0x00FC, 0x00CF, 0x02FC, 0x02CF, 0x00B7, 0x5080, 0x007C, 0x280C, 0x0A6C, 0xAA00, 0xB000, 0x2890			;Letras A  a Z
 MEM_LED		.byte 0x07,0x0E,0X12,0X03,0X05,0X09
 ;-------------------------------------------------------------------------------
             .def    RESET                   ; Export program entry-point to
@@ -192,7 +194,7 @@ CNF_LCD_4MUX
 			ret
                                             
 
-PRINT_CARAC
+PRT_NUM
 
 			push		R15							;Salva R15 na pilha
 			push		R14							;Salva R14 na pilha
@@ -221,12 +223,43 @@ PRINT_CARAC
 
 			mov.b		R15,LCDM1(R14)				;Mostra o outros segmentos do Caracter. Carater completo
 
-			jmp 		FIM_PRINT_CARAC
-
-FIM_PRINT_CARAC
 			pop			R14							;Restaura R14 da pilha
 			pop			R15							;Restaura R15 da pilha
 			ret
+
+PRT_MAISC
+
+			push		R15							;Salva R15 na pilha
+			push		R14							;Salva R14 na pilha
+
+
+			mov.w		6(SP),R15					;Pega o caracter a ser mostrado no display
+			mov.w		8(SP),R14					;Pega a posição onde vai ser impresso
+
+			rla			R15							;R15 * 2, pula dois endereços na memória, caracter de 16bits
+
+			mov.b		MEM_LED(R14),R14			;Pega no array MEM_LED, o offset da posição de memória
+													;do LCD. Serve para mostramos o caracter numa posição
+													; específica do Display. Conforme argumento passado
+													;para a função.
+
+			mov			MAIUSCULAS(R15),R15			;Pega no array NUMEROS, os segmentos que vão ser
+													;ligados no LCD.
+
+			mov.b		R15,LCDM1(R14)				;Mostra o caracter contido em R15 no Display
+			inc			R14							;Incrementa R14. Pega Próxima posição de Memória do
+													;Display. Para ligar mais segmentos.
+
+			swpb		R15							;Troca o byte superior com o byte inferior do registrado
+													;O byte superior contem outros segmentos que precisam
+													;mostrados no display para mostrar o caracter completo
+
+			mov.b		R15,LCDM1(R14)				;Mostra o outros segmentos do Caracter. Carater completo
+
+			pop			R14							;Restaura R14 da pilha
+			pop			R15							;Restaura R15 da pilha
+			ret
+
 
 ;-------------- Configura o Timer_A, modo up -------------
 CNF_TIMER
@@ -247,11 +280,12 @@ CONTADOR
 L1			cmp		#6,R14
  			jz		FIM_CONTADOR
 
- 			call	#PRINT_CARAC
+ 			;call	#PRINT_CARAC
 
  			inc		R14
  			mov		R14,2(SP)
- 			call	#PRINT_CARAC
+ 			;call	#PRT_NUM
+ 			call	#PRT_MAISC
  			jmp 	L1
 ZERA_CONTADOR
  			mov		#0,R15
@@ -261,7 +295,7 @@ FIM_CONTADOR
 			pop		R15
 			pop		R14
 			inc 	R15
-			cmp 	#10,R15
+			cmp 	#26,R15
 			jz		ZERA_CONTADOR
  			reti
 ;-------------------------------------------------------------------------------

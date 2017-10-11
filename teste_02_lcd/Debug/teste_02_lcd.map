@@ -1,7 +1,7 @@
 ******************************************************************************
                   MSP430 Linker Unix v16.9.4                   
 ******************************************************************************
->> Linked Tue Oct 10 14:36:56 2017
+>> Linked Tue Oct 10 23:23:03 2017
 
 OUTPUT FILE NAME:   <teste_02_lcd.out>
 ENTRY POINT SYMBOL: "RESET"  address: 00004400
@@ -18,8 +18,8 @@ MEMORY CONFIGURATION
   INFOC                 00001880   00000080  00000000  00000080  RWIX
   INFOB                 00001900   00000080  00000000  00000080  RWIX
   INFOA                 00001980   00000080  00000000  00000080  RWIX
-  RAM                   00001c00   00000800  0000001a  000007e6  RWIX
-  FRAM                  00004400   0000bb80  000000c6  0000baba  RWIX
+  RAM                   00001c00   00000800  0000004e  000007b2  RWIX
+  FRAM                  00004400   0000bb80  000000e8  0000ba98  RWIX
   JTAGSIGNATURE         0000ff80   00000004  00000004  00000000  RWIX  ffff 
   BSLSIGNATURE          0000ff84   00000004  00000004  00000000  RWIX  ffff 
   IPESIGNATURE          0000ff88   00000008  00000008  00000000  RWIX  ffff 
@@ -115,15 +115,15 @@ section   page    origin      length       input sections
 .init_array 
 *          0    00004400    00000000     UNINITIALIZED
 
-.text      0    00004400    000000be     
-                  00004400    000000be     main.obj (.text)
+.text      0    00004400    000000e0     
+                  00004400    000000e0     main.obj (.text)
 
 .text:_isr 
-*          0    000044be    00000008     
-                  000044be    00000008     rts430x_sc_sd_eabi.lib : isr_trap.obj (.text:_isr:__TI_ISR_TRAP)
+*          0    000044e0    00000008     
+                  000044e0    00000008     rts430x_sc_sd_eabi.lib : isr_trap.obj (.text:_isr:__TI_ISR_TRAP)
 
-.data      0    00001c00    0000001a     
-                  00001c00    0000001a     main.obj (.data)
+.data      0    00001c00    0000004e     
+                  00001c00    0000004e     main.obj (.data)
 
 .stack     0    00002400    00000000     
 
@@ -238,9 +238,9 @@ MODULE SUMMARY
        Module         code   ro data   rw data
        ------         ----   -------   -------
     ./
-       main.obj       190    4         26     
+       main.obj       224    4         78     
     +--+--------------+------+---------+---------+
-       Total:         190    4         26     
+       Total:         224    4         78     
                                               
     /opt/ti/ccsv7/tools/compiler/ti-cgt-msp430_16.9.4.LTS/lib/rts430x_sc_sd_eabi.lib
        isr_trap.obj   8      0         0      
@@ -275,7 +275,7 @@ MODULE SUMMARY
        Total:         8      54        0      
                                               
     +--+--------------+------+---------+---------+
-       Grand Total:   198    58        26     
+       Grand Total:   232    58        78     
 
 
 GLOBAL SYMBOLS: SORTED ALPHABETICALLY BY Name 
@@ -1679,7 +1679,7 @@ address   name
 0000015c  WDTCTL_L            
 00002400  __STACK_END         
 00000000  __STACK_SIZE        
-000044be  __TI_ISR_TRAP       
+000044e0  __TI_ISR_TRAP       
 0000ffc6  __TI_int27          
 0000ffc8  __TI_int28          
 0000ffca  __TI_int29          
@@ -3132,7 +3132,7 @@ address   name
 00004400  fram_ipe_start      
 00004400  fram_rw_start       
 00004400  fram_rx_start       
-000044be  __TI_ISR_TRAP       
+000044e0  __TI_ISR_TRAP       
 0000a501  mpu_ctl0_value      
 0000ffc6  __TI_int27          
 0000ffc8  __TI_int28          
