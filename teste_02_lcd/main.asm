@@ -16,16 +16,23 @@
 
 ;----------- Definições para o Display
 
-            .define BIT0,	SEG_M					;
-            .define BIT1,	SEG_G					;	  AAAAAAAAA
-            .define BIT2,	SEG_F					;	 F H  J  K B
-            .define BIT3,	SEG_E					;    F  H J K  B
-            .define BIT4,	SEG_D					;    F    J    B
-            .define BIT5,	SEG_C					;	   GGG MMM
-            .define BIT6,	SEG_B					;	 E    P    C
-            .define BIT7,	SEG_A					;	 E	Q P N  C
-            .define BIT8,	SEG_H					;    E Q  P  N C
-            										;     DDDDDDDDD
+            .define	BIT0,	SEG_M					;
+            .define	BIT1,	SEG_G					;	  AAAAAAAAA
+            .define	BIT2,	SEG_F					;	 F H  J  K B
+            .define	BIT3,	SEG_E					;    F  H J K  B
+            .define	BIT4,	SEG_D					;    F    J    B
+            .define	BIT5,	SEG_C					;	   GGG MMM
+            .define	BIT6,	SEG_B					;	 E    P    C
+            .define	BIT7,	SEG_A					;	 E	Q P N  C
+            .define	BIT8,	SEG_DP					;    E Q  P  N C
+            .define	BIT9,	SEG_N					;     DDDDDDDDD
+            .define	BITA,	SEG_NEG
+            .define	BITB,	SEG_Q
+            .define	BITC,	SEG_P
+            .define	BITD,	SEG_K
+            .define	BITE,	SEG_J
+            .define	BITF,	SEG_H
+
 
 
 			.define SEG_A | SEG_B | SEG_C | SEG_D | SEG_E | SEG_F, 					DIGITO_0
@@ -41,7 +48,15 @@
 			.define SEG_A | SEG_F | SEG_B | SEG_G | SEG_M | SEG_C | SEG_E,			LETRA_A
 			.define SEG_F | SEG_G | SEG_M | SEG_C | SEG_D | SEG_E,					LETRA_b
 			.define SEG_A | SEG_F | SEG_E | SEG_E, 									LETRA_C
+			.define	SEG_M | SEG_G | SEG_J | SEG_P | SEG_K | SEG_Q | SEG_H | SEG_N,	CARAC_ASTER
 
+PRTDSP		.macro	POS_LCD, CARAC, TP_CARAC
+			push	POS_LCD
+			push	CARAC
+			push	TP_CARAC
+			call	#PRT_CARAC
+			add		#6,SP
+			.endm
 
 
 
@@ -51,6 +66,7 @@
 NUMEROS		.word 0x28FC, 0x2060, 0x00DB, 0x00F3, 0x0067, 0x00B7, 0x00BF, 0x00E4, 0x00FF, 0x00F7			;Digitos de "0" a "9"
 MAIUSCULAS	.word 0x00EF, 0x50F1, 0x009C, 0x50F0, 0x009F, 0x008F, 0x00BD, 0x006F, 0x5090, 0x0078, 0x220E, 0x001C, 0xA06C
 			.word 0x826C, 0x00FC, 0x00CF, 0x02FC, 0x02CF, 0x00B7, 0x5080, 0x007C, 0x280C, 0x0A6C, 0xAA00, 0xB000, 0x2890			;Letras A  a Z
+			.word 0xFA03
 MEM_LED		.byte 0x07,0x0E,0X12,0X03,0X05,0X09
 ;-------------------------------------------------------------------------------
             .def    RESET                   ; Export program entry-point to
@@ -77,6 +93,10 @@ StopWDT     mov.w   #WDTPW|WDTHOLD,&WDTCTL  ; Stop watchdog timer
 			mov		#0,R15
 
 
+			push	#0
+			call 	#DSP_PING_PONG
+			push	#1
+			call 	#DSP_PING_PONG
 
 
 			;push	#NUM_1
@@ -192,60 +212,42 @@ CNF_LCD_4MUX
 
 
 			ret
-                                            
 
-PRT_NUM
+;------------------ Imprime Carateres na Telas -------------------------------
+
+PRT_CARAC											;recebe três parametros POS_LCD,CARAC,TP_CARAC pela pilha
+													;POS_LCD -> Onde o caracter vai ser impresso no LCD. POS_LCD = 0,
+													;posição mais a direita, POS_LCD = 5, Posição mais a esquerda.
+													;CARAC -> Caracter que vai ser impresso na tela do LCD
+													;TP_CARAC -> tipo do caracter; TP_CARAC = 0, mostra numeros,
+													;TP_CARAC = 1, mostra letras maiusculas
+													;TP_CARAC = 2, mostra letras minúsculas (a implementar)
 
 			push		R15							;Salva R15 na pilha
 			push		R14							;Salva R14 na pilha
+			push		R13							;Salva R13 na pilha
 
-
-			mov.w		6(SP),R15					;Pega o caracter a ser mostrado no display
-			mov.w		8(SP),R14					;Pega a posição onde vai ser impresso
+			mov.w		8(SP), R13
+			mov.w		10(SP), R15					;Pega o parametro CARAC
+			mov.w		12(SP),R14					;Pega o parametros POS_LCD
 
 			rla			R15							;R15 * 2, pula dois endereços na memória, caracter de 16bits
 
 			mov.b		MEM_LED(R14),R14			;Pega no array MEM_LED, o offset da posição de memória
 													;do LCD. Serve para mostramos o caracter numa posição
 													; específica do Display. Conforme argumento passado
-													;para a função.
-
+IF_PRT_NUM													;para a função.
+			cmp			#0,R13
+			jnz			IF_PRT_MAI
 			mov			NUMEROS(R15),R15			;Pega no array NUMEROS, os segmentos que vão ser
 													;ligados no LCD.
-
-			mov.b		R15,LCDM1(R14)				;Mostra o caracter contido em R15 no Display
-			inc			R14							;Incrementa R14. Pega Próxima posição de Memória do
-													;Display. Para ligar mais segmentos.
-
-			swpb		R15							;Troca o byte superior com o byte inferior do registrado
-													;O byte superior contem outros segmentos que precisam
-													;mostrados no display para mostrar o caracter completo
-
-			mov.b		R15,LCDM1(R14)				;Mostra o outros segmentos do Caracter. Carater completo
-
-			pop			R14							;Restaura R14 da pilha
-			pop			R15							;Restaura R15 da pilha
-			ret
-
-PRT_MAISC
-
-			push		R15							;Salva R15 na pilha
-			push		R14							;Salva R14 na pilha
-
-
-			mov.w		6(SP),R15					;Pega o caracter a ser mostrado no display
-			mov.w		8(SP),R14					;Pega a posição onde vai ser impresso
-
-			rla			R15							;R15 * 2, pula dois endereços na memória, caracter de 16bits
-
-			mov.b		MEM_LED(R14),R14			;Pega no array MEM_LED, o offset da posição de memória
-													;do LCD. Serve para mostramos o caracter numa posição
-													; específica do Display. Conforme argumento passado
-													;para a função.
-
-			mov			MAIUSCULAS(R15),R15			;Pega no array NUMEROS, os segmentos que vão ser
+			jmp			FIM_IF_PRT
+IF_PRT_MAI
+			;cmp			#1,R13					;a ser implementado qdo, imprimir minusculas
+			mov			MAIUSCULAS(R15),R15			;Pega no array MAIUSCULAS, os segmentos que vão ser
 													;ligados no LCD.
 
+FIM_IF_PRT
 			mov.b		R15,LCDM1(R14)				;Mostra o caracter contido em R15 no Display
 			inc			R14							;Incrementa R14. Pega Próxima posição de Memória do
 													;Display. Para ligar mais segmentos.
@@ -256,18 +258,18 @@ PRT_MAISC
 
 			mov.b		R15,LCDM1(R14)				;Mostra o outros segmentos do Caracter. Carater completo
 
+			pop			R13							;Restaura R13 da pilha
 			pop			R14							;Restaura R14 da pilha
 			pop			R15							;Restaura R15 da pilha
 			ret
 
-
-;-------------- Configura o Timer_A, modo up -------------
+;------------------ Configura o Timer_A, modo up -----------------------------
 CNF_TIMER
-			mov.w   #CCIE,&TA0CCTL0         ; TACCR0 interupção habilitada
-            mov.w   #UM_SEG,&TA0CCR0			; Conta até 32767 e gera interrupção
-            mov.w   #TASSEL__ACLK+MC__UP,&TA0CTL  ; Usa oscilador ACLK(32.768)pg.15 user guide launch, modo up
-            nop                             ;
-            bis.w   #GIE,SR            		; habilita interrupções mascaráveis
+			mov.w   #CCIE,&TA0CCTL0        		 	; TACCR0 interupção habilitada
+            mov.w   #UM_SEG,&TA0CCR0				; Conta até 32767 e gera interrupção
+            mov.w   #TASSEL__ACLK+MC__UP,&TA0CTL  	; Usa oscilador ACLK(32.768)pg.15 user guide launch, modo up
+            nop
+            ;bis.w   #GIE,SR            				; habilita interrupções mascaráveis
             nop
             ret
 
@@ -276,28 +278,57 @@ CONTADOR
  			mov 	#0,R14
  			push	R14
  			push 	R15
+ 			push	#0
 
 L1			cmp		#6,R14
  			jz		FIM_CONTADOR
 
- 			;call	#PRINT_CARAC
 
+ 			mov		R14,4(SP)
+ 			call	#PRT_CARAC
  			inc		R14
- 			mov		R14,2(SP)
- 			;call	#PRT_NUM
- 			call	#PRT_MAISC
  			jmp 	L1
 ZERA_CONTADOR
  			mov		#0,R15
  			reti
 
 FIM_CONTADOR
+			add		#2,SP
 			pop		R15
 			pop		R14
 			inc 	R15
-			cmp 	#26,R15
+			cmp 	#36,R15
 			jz		ZERA_CONTADOR
  			reti
+
+
+DSP_PING_PONG
+ 			push	R15
+ 			mov 	4(SP),R15
+
+ 			mov		#CARAC_ASTER,R14
+
+
+IF_IN_DIR
+ 			cmp		#0,R15
+ 			jnz		IN_ESQ
+
+ 			PRTDSP	#0,#36,#0			;PRTDSP(POS_LCD, CARAC, TP_CARAC), imprime no Display
+
+ 			mov 	#0,R13
+
+ 			jmp		FIM_IF_IN_DIR
+IN_ESQ
+
+			PRTDSP	#5,#36,#1			;PRTDSP(POS_LCD, CARAC, TP_CARAC), imprime no Display
+			mov 	#5,R13
+
+FIM_IF_IN_DIR
+
+
+ 			jmp		FIM_IF_IN_DIR
+ 			pop		R15
+ 			ret
 ;-------------------------------------------------------------------------------
 ; Stack Pointer definition
 ;-------------------------------------------------------------------------------
