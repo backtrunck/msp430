@@ -21,4 +21,12 @@ ENV_BYTE_TO_LCD_MAC		.macro	REGISTRADOR,BYTE
 									call	#ENVIA_BYTE_TO_LCD
 									add		#4,SP
 						.endm
-INICIAR_LCD_MC			.macro	PORTA_RS,PORT
+INICIAR_LCD_MC			.macro	PORTA_RS,BIT_RS,PORT_ENABLE,BIT_ENABLE,BUFFER_DADOS
+									push	PORTA_RS
+									push 	BIT_RS
+									push	PORT_ENABLE
+									push	BIT_ENABLE
+									push	BUFFER_DADOS
+									call	#INICIAR_LCD
+									add		#8,SP
+						.endm

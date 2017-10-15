@@ -56,6 +56,7 @@ StopWDT     mov.w   #WDTPW|WDTHOLD,&WDTCTL  ; Stop watchdog timer
 LOOP
 			PULSO_MAC #P2OUT
 			MSG_TO_LCD_MAC #MSG
+			INICIAR_LCD_MC #P2OUT,#BIT5,#P2OUT,#BIT1,#P4OUT
 
 			jmp	LOOP
 			nop
@@ -97,7 +98,7 @@ ENVIA_BYTE_TO_LCD
 			mov.b	0(R15),R13
 			rra		R13
 			rra		R13
-			rra		R13
+			rra		R13PUSH
 			rra		R13
 			DELAY_TIMER_1_MAC #UM_MILI_SEG
 			and.b		#BIT3 | BIT2 | BIT1 | BIT0,R13
@@ -111,8 +112,31 @@ ENVIA_BYTE_TO_LCD
 
 
 INICIAR_LCD
-			Ṕ
-P2.5
+			push	R15
+			push	R14
+			push	R13
+
+			;mov.w 	10(SP),R15
+			mov.w 	12(SP),R15
+			mov.w 	16(SP),R14
+			mov.w 	18(SP),R13
+
+			bic.b	10(SP),0(R14)		;Desliga RS
+			mov.b	BIT0 | BIT1,0(R13)	;envia 0x03 para o lcd
+
+			PULSO_MAC #P2OUT			;envia pulso
+
+			DELAY_TIMER_1_MAC ;colocar 5milis
+
+			PULSO_MAC #P2OUT			;envia pulso
+
+			DELAY_TIMER_1_MAC ;colocar 1milis
+
+			PULSO_MAC #P2OUT			;envia pulso
+
+			pop 	R14
+			pop		R15
+
 
 
 DELAY_TIMER_1
@@ -122,6 +146,7 @@ DELAY_TIMER_1
 			bis.w	#LPM3 | GIE, SR
 			nop
 			bic.w	#CCIE,&TA1CCTL0
+
 			ret
 
 TRATA_TIMER1_A0
