@@ -11,6 +11,8 @@
             .def    RESET                   ; Export program entry-point to
                                             ; make it known to linker.
 ;-------------------------------------------------------------------------------
+			.data
+MSG			.byte	'a'
             .text                           ; Assemble into program memory.
             .retain                         ; Override ELF conditional linking
                                             ; and retain current section.
@@ -41,8 +43,8 @@ StopWDT     mov.w   #WDTPW|WDTHOLD,&WDTCTL  ; Stop watchdog timer
 ;-------------------------------------------------------------------------------
 ;			Configura o Timer_A_1, modo continuo
 ;-------------------------------------------------------------------------------
-			;mov.w   #CCIE,&TA1CCTL0         		; TACCR0 interupção habilitada
-            mov.w   #UM_MILI_SEG,&TA1CCR0			; Interruções em 1 milisegundos
+			mov.w   #CCIE,&TA1CCTL0         		; TACCR0 interupção habilitada
+            ;mov.w   #UM_MILI_SEG,&TA1CCR0			; Interruções em 1 milisegundos
             mov.w   #TASSEL__ACLK+MC__UP,&TA1CTL  	; Usa oscilador ACLK(32.768)pg.15 user guide launch, modo up
             ;nop
             ;bis.w   #GIE,SR            				; habilita interrupções mascaráveis
@@ -52,14 +54,79 @@ StopWDT     mov.w   #WDTPW|WDTHOLD,&WDTCTL  ; Stop watchdog timer
 ; Main loop here
 ;-------------------------------------------------------------------------------
 LOOP
+			PULSO_MAC #P2OUT
+			MSG_TO_LCD_MAC #MSG
+
 			jmp	LOOP
 			nop
 
 PULSO
-			bic.b	#bit1,P2OUT
-			bis.b	#bit1,P2OUT
-			DELAY
-			bic.b	#bit1,P2OUT
+			push	R15
+			mov.w	4(SP), R15
+			bic.b	#BIT1,0(R15)						;Desliga P2.1 (Pino Enable)
+			bis.b	#BIT1,0(R15)						;Liga P2.1 (Pino Enable)
+			DELAY_TIMER_1_MAC #UM_MILI_SEG				;Aguarda 1ms
+			bic.b	#BIT1,0(R15)						;Desliga P2.1 (Pino Enable)
+			pop 	R15
+			ret
+
+MSG_TO_LCD
+
+			push	R15
+			mov.w	4(SP), R15
+			cmp.b	#0,0(R15)
+			jz		F_MSG
+			ENV_BYTE_TO_LCD_MAC #P2OUT,R15
+			;terminar loop
+F_MSG
+			pop		R15
+			ret
+
+
+ENVIA_BYTE_TO_LCD
+			push	R15
+			push	R14
+			push	R13
+			mov.w 	8(SP),R15
+			mov.w 	10(SP),R14
+			mov.b	0(R15),R13
+			DELAY_TIMER_1_MAC #UM_MILI_SEG
+			and.b		#BIT3 | BIT2 | BIT1 | BIT0,R13
+			and.b		#BIT7 | BIT6 | BIT5 | BIT4,0(R14)
+			xor.b	R13,0(R14)
+			mov.b	0(R15),R13
+			rra		R13
+			rra		R13
+			rra		R13
+			rra		R13
+			DELAY_TIMER_1_MAC #UM_MILI_SEG
+			and.b		#BIT3 | BIT2 | BIT1 | BIT0,R13
+			and.b		#BIT7 | BIT6 | BIT5 | BIT4,0(R14)
+			xor.b	R13,0(R14)
+
+			pop 	R13
+			pop 	R14
+			pop		R15
+			ret
+
+
+INICIAR_LCD
+			Ṕ
+P2.5
+
+
+DELAY_TIMER_1
+			bis.w   #CCIE,&TA1CCTL0
+			mov.w   2(SP),&TA1CCR0
+			nop
+			bis.w	#LPM3 | GIE, SR
+			nop
+			bic.w	#CCIE,&TA1CCTL0
+			ret
+
+TRATA_TIMER1_A0
+			bic.w 	#LPM3,0(SP)
+			reti
 
 ;-------------------------------------------------------------------------------
 ; Stack Pointer definition
@@ -72,4 +139,6 @@ PULSO
 ;-------------------------------------------------------------------------------
             .sect   ".reset"                ; MSP430 RESET Vector
             .short  RESET
+            .sect  TIMER1_A0_VECTOR
+            .short TRATA_TIMER1_A0
             

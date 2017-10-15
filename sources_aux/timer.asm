@@ -1,9 +1,24 @@
 DELAY_TIMER_1_MAC	.macro	QT_SEGUNDOS
-				push	QT_SEGUNDOS
-				call	#DELAY_TIMER_1
-				add	#2,SP
-	.endm
+						push	QT_SEGUNDOS
+						call	#DELAY_TIMER_1
+						add	#2,SP
+					.endm
+PULSO_MAC			.macro		PORTA_ENABLE
+						push	PORTA_ENABLE
+						call	#PULSO
+						add	#2,SP
+					.endm
 
+MSG_TO_LCD_MAC		.macro	MESSAGEM
+						push	MESSAGEM
+						call	#MSG_TO_LCD
+						add		#2,SP
+					.endm
 
-DELAY_TIMER_1
-	mov.w   8(SP),&TA1CCR0
+ENV_BYTE_TO_LCD_MAC		.macro	REGISTRADOR,BYTE
+									push	REGISTRADOR
+									push	BYTE
+									call	#ENVIA_BYTE_TO_LCD
+									add		#4,SP
+						.endm
+INICIAR_LCD_MC			.macro	PORTA_RS,PORT
