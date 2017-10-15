@@ -5,7 +5,8 @@
 ;-------------------------------------------------------------------------------
 			.define	32768,UM_SEG
 			.eval UM_SEG / 2,MEIO_SEG
-			.define	0,SAQUE_INICIAL
+			.eval	32767 * 2,DOIS_SEG
+			.define	0,PREP_SAQUE
 			.define 1,SAQUE_JG_DIR
 			.define	2,SAQUE_JG_ESQ
 			.define	3,EM_JOGO
@@ -13,6 +14,8 @@
 			.define	1,JG_DIR_REBATEU
 			.define 0,PARA_ESQ
 			.define 1,PARA_DIR
+			.define 5,TMP_PREP_SAQUE
+
 
             .cdecls C,LIST,"msp430.h"       ; Include device header file
             
@@ -36,6 +39,11 @@ PONTOS_JQ_ESQ
 ESTADO
 			.byte	0x00
 REBATIDA	.byte	0x00
+
+EM_PAUSA	.byte	0x00
+FREQ_ATUAL	.word	0x0000
+
+
 
 ;-------------------------------------------------------------------------------
 RESET       mov.w   #__STACK_END,SP         ; Initialize stackpointer
@@ -79,6 +87,7 @@ StopWDT     mov.w   #WDTPW|WDTHOLD,&WDTCTL  ; Stop watchdog timer
             mov.b	#BIT0,&LEDS
             mov.b	&LEDS,P9OUT
             mov.b	#SAQUE_JG_DIR,&ESTADO
+            mov.b	#0,&EM_PAUSA
 ;-------------------------------------------------------------------------------
 
 ;-------------------------------------------------------------------------------
@@ -105,15 +114,15 @@ JG_ESQ_SACA
 JG_DIR_SACA
  			mov.b	#BIT0,&LEDS
             mov.b	&LEDS,P9OUT
-            mov.b	#0,DIRECAO
+            mov.b	#PARA_ESQ,DIRECAO
             reti
 INICIO
-			cmp.b	#0,DIRECAO
+			cmp.b	#PARA_ESQ,DIRECAO
 			jnz		DIR
 ESQ
 			bit.b	#BIT6,LEDS
 			jnz		DIR
-			mov.b	#0,DIRECAO
+			mov.b	#PARA_ESQ,DIRECAO
 			bit.b	#BIT0,LEDS
 			jz		MOVE_BOLA_ESQ
 			cmp.b	#JG_DIR_REBATEU,&REBATIDA
@@ -124,13 +133,12 @@ MOVE_BOLA_ESQ
 			mov.b	&LEDS,P9OUT
 			reti
 JG_DIR_NAO_REBATEU
-			inc.b	&PONTOS_JQ_ESQ
-			call	#PREP_SQ_ESQ
+			call 	#FALHA_JG_DIR
 			reti
 DIR
 			bit.b	#BIT0,LEDS
 			jnz		ESQ
-			mov.b	#1,DIRECAO
+			mov.b	#PARA_DIR,DIRECAO
 			bit.b	#BIT6,LEDS
 			jz		MOVE_BOLA_DIR
 			cmp.b	#JG_ESQ_REBATEU,&REBATIDA
@@ -141,8 +149,7 @@ MOVE_BOLA_DIR
 			mov.b	LEDS,P9OUT
 			reti
 JG_ESQ_NAO_REBATEU
-			inc.b	&PONTOS_JQ_DIR
-			call	#PREP_SQ_DIR
+			call 	#FALHA_JG_ESQ
 F_PISCA
 			reti
 
@@ -155,33 +162,47 @@ BUTTON_JG
 			nop								;Vetor 0:sem interrupção
 			nop								;Vetor 0:sem interrupção
 			nop								;Vetor 0:sem interrupção
-			jmp		BUTTON_JG_ESQ			;Jogador da direita pressionou o botão
+			nop
 			jmp		BUTTON_JG_DIR			;Jogador da esquerda pressionou o botão
+			jmp		BUTTON_JG_ESQ			;Jogador da direita pressionou o botão
+
 
 BUTTON_JG_DIR
+			cmp.b	#1,&EM_PAUSA
+			jz		F_BUTTON
 			bit.b	#BIT0,LEDS				;O led mais a esquerda esta aceso?
 			jz		ERR_JG_DIR
+			cmp.b	#SAQUE_JG_DIR,&ESTADO
+			jz		SAQUE_DIR
+			call	#VELOC_AUMENTAR
+SAQUE_DIR
 			mov.b	#JG_DIR_REBATEU,&REBATIDA
 			jmp		RETOMA_JOGO
 ERR_JG_DIR
 			cmp.b	#SAQUE_JG_ESQ,&ESTADO
-			jz		RETOMA_JOGO
-			inc.b	&PONTOS_JQ_ESQ
-			call	PREP_SQ_ESQ
-			jmp		RETOMA_JOGO
+			jz		F_BUTTON
+			call 	#FALHA_JG_DIR
+			reti
 BUTTON_JG_ESQ
+			cmp.b	#1,&EM_PAUSA
+			jz		F_BUTTON
 			bit.b	#BIT6,LEDS				;O led mais a esquerda esta aceso?
 			jz		ERR_JG_ESQ
+			cmp.b	#SAQUE_JG_ESQ,&ESTADO
+			jz		SAQUE_ESQ
+			call	#VELOC_AUMENTAR
+SAQUE_ESQ
 			mov.b	#JG_ESQ_REBATEU,&REBATIDA
 			jmp		RETOMA_JOGO
 ERR_JG_ESQ
 			cmp.b	#SAQUE_JG_DIR,&ESTADO
-			jz		RETOMA_JOGO
-			inc.b	&PONTOS_JQ_DIR
-			call	PREP_SQ_DIR
+			jz		F_BUTTON
+			call	#FALHA_JG_ESQ
+			reti
 RETOMA_JOGO
 			xor		#CCIE,&TA0CCTL0
 			mov.b	#EM_JOGO,&ESTADO
+F_BUTTON
 			reti
 
 PREP_SQ_DIR
@@ -189,13 +210,95 @@ PREP_SQ_DIR
 			mov.b	#PARA_ESQ,DIRECAO
 			mov.b	#BIT0,&LEDS
             mov.b	&LEDS,P9OUT
+            call	#PAUSA_SQ_LIGAR
         	ret
 PREP_SQ_ESQ
 			mov.b	#SAQUE_JG_ESQ,&ESTADO
 			mov.b	#PARA_DIR,DIRECAO
 			mov.b	#BIT6,&LEDS
             mov.b	&LEDS,P9OUT
+            call	#PAUSA_SQ_LIGAR
             ret
+
+PAUSA_SQ_LIGAR
+			mov.b	#TMP_PREP_SAQUE,R15
+			nop
+			bic.w   #GIE,SR   						; desabilita interrupções mascaráveis
+			nop
+			bic		#CCIE,&TA0CCTL0
+
+			bic		#BIT5,P1IE
+			bic		#BIT6,P1IE
+			bis		#CCIE,&TA0CCTL1         		; TACCR1 interupção habilitada
+			mov.w	&TA0CCR0,&FREQ_ATUAL
+			mov.w	#UM_SEG,&TA0CCR0
+            mov.w   #UM_SEG,&TA0CCR1				; Contar três segundos e gera interrupção
+            mov.b	#1,&EM_PAUSA
+            nop
+            bis.w   #GIE,SR            				; habilita interrupções mascaráveis
+            nop
+
+            ret
+
+TA0_HND
+			add		&TA0IV,PC ; Add offset to Jump table
+			RETI ; Vector 0: No interrupt
+			JMP PAUSA_SQ_DELIGAR ; Vector 2: TA0CCR1
+
+PAUSA_SQ_DELIGAR
+			cmp.b   #SAQUE_JG_DIR,&ESTADO
+			jz		PISCA_DIR
+			xor		#BIT6,&LEDS
+			mov.b	&LEDS,P9OUT
+			jmp		PSD_1
+PISCA_DIR
+			xor		#BIT0,&LEDS
+			mov.b	&LEDS,P9OUT
+
+PSD_1		cmp.b	#0,R15
+			jnz		F_TIME
+			nop
+			bic.w   #GIE,SR   						; desabilita interrupções mascaráveis
+			nop
+			mov.b	#0,&EM_PAUSA
+			bic		#BIT5,P1IFG
+			bic		#BIT6,P1IFG
+			bis		#BIT5,P1IE
+			bis		#BIT6,P1IE
+			bis		#CCIE,&TA0CCTL0
+            bic		#CCIE,&TA0CCTL1
+            mov.w	&FREQ_ATUAL,&TA0CCR0
+            mov.w	&FREQ_ATUAL,&TA0CCR1
+
+            nop
+            bis.w   #GIE,SR            				; habilita interrupções mascaráveis
+            nop
+
+            reti
+F_TIME
+			dec.b	R15
+			reti
+
+
+FALHA_JG_DIR
+			inc.b	&PONTOS_JQ_ESQ
+			call	#PREP_SQ_ESQ
+			ret
+
+FALHA_JG_ESQ
+			inc.b	&PONTOS_JQ_DIR
+			call	#PREP_SQ_DIR
+			ret
+
+VELOC_AUMENTAR
+			;rra		&TA0CCR0
+			sub		#0x600,&TA0CCR0
+			;jn		NEGATIVO
+			ret
+NEGATIVO
+			mov.w	#0x600,&TA0CCR0
+			ret
+
 
 
 ;-------------------------------------------------------------------------------
@@ -211,6 +314,10 @@ PREP_SQ_ESQ
             .short  RESET
             .sect   TIMER0_A0_VECTOR        ; Timer0_A3 CC0 Vetor Interrução do timer
             .short  PISCA
+
+            .sect	TIMER0_A1_VECTOR
+            .short  TA0_HND
+
             .sect	PORT1_VECTOR
             .short	BUTTON_JG				;Trata o pressionamento dos botões dos jogadores
 
