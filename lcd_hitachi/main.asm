@@ -6,6 +6,7 @@
             .cdecls C,LIST,"msp430.h"       ; Include device header file
             .include	timer.asm
             .define	32,	UM_MILI_SEG
+            .eval	32 * 5, CINCO_MILI_SEG
             
 ;-------------------------------------------------------------------------------
             .def    RESET                   ; Export program entry-point to
@@ -13,6 +14,16 @@
 ;-------------------------------------------------------------------------------
 			.data
 MSG			.byte	'a'
+CONF_LCD	.byte	0x28
+DISPLAY_OFF	.byte	0x08
+DISPLAY_CLEAR
+			.byte	0x01
+MODE_SET
+F			.byte	0x0F
+COMANDO		.byte	0xC0
+
+
+
             .text                           ; Assemble into program memory.
             .retain                         ; Override ELF conditional linking
                                             ; and retain current section.
@@ -49,12 +60,20 @@ StopWDT     mov.w   #WDTPW|WDTHOLD,&WDTCTL  ; Stop watchdog timer
             ;nop
             ;bis.w   #GIE,SR            				; habilita interrupções mascaráveis
             ;nop
+            INICIAR_LCD_MC #P2OUT,#BIT5,#P2OUT,#BIT1,#P4OUT
+            bis.b	#BIT5,P2OUT
+            MSG_TO_LCD_MAC  #MSG
+            bic.b	#BIT5,P2OUT
+            ENV_BYTE_TO_LCD_MAC #P2OUT,#COMANDO
+            bis.b	#BIT5,P2OUT
+            MSG_TO_LCD_MAC  #MSG
+
 
 ;-------------------------------------------------------------------------------
 ; Main loop here
 ;-------------------------------------------------------------------------------
 LOOP
-			PULSO_MAC #P2OUT
+			PULSO_MAC #P2OUT,#BIT1
 			MSG_TO_LCD_MAC #MSG
 			INICIAR_LCD_MC #P2OUT,#BIT5,#P2OUT,#BIT1,#P4OUT
 
@@ -62,52 +81,54 @@ LOOP
 			nop
 
 PULSO
-			push	R15
-			mov.w	4(SP), R15
-			bic.b	#BIT1,0(R15)						;Desliga P2.1 (Pino Enable)
-			bis.b	#BIT1,0(R15)						;Liga P2.1 (Pino Enable)
+			push	R15									;salva na pilha
+			push	R14									;salva na pilha
+			mov.w	8(SP), R15							;Retira da pilha a GPIO passada
+			bic.b	6(SP),0(R15)						;Desliga a GPIO passada, usando o bit passado, (Pino Enable) Ex. P2.1
+			bis.b	6(SP),0(R15)						;Liga a GPIO passada, usando o bit passado, P2.1 (Pino Enable)
 			DELAY_TIMER_1_MAC #UM_MILI_SEG				;Aguarda 1ms
-			bic.b	#BIT1,0(R15)						;Desliga P2.1 (Pino Enable)
-			pop 	R15
+			bic.b	6(SP),0(R15)						;Desliga a GPIO passada, usando o bit passado, (Pino Enable) Ex. P2.1 (
+			pop 	R14									;restaura R14
+			pop 	R15									;restaura R15
 			ret
 
 MSG_TO_LCD
 
-			push	R15
-			mov.w	4(SP), R15
-			cmp.b	#0,0(R15)
-			jz		F_MSG
+			push	R15									;salva na pilha
+			mov.w	4(SP), R15							;Retira da pilha o ponteiro da mensagem a ser enviado
+			cmp.b	#0,0(R15)							;Compara com NULL
+			jz		F_MSG								;Se for NULL, pula
 			ENV_BYTE_TO_LCD_MAC #P2OUT,R15
 			;terminar loop
 F_MSG
-			pop		R15
+			pop		R15									;restaura da pilha
 			ret
 
 
 ENVIA_BYTE_TO_LCD
-			push	R15
-			push	R14
-			push	R13
-			mov.w 	8(SP),R15
-			mov.w 	10(SP),R14
-			mov.b	0(R15),R13
-			DELAY_TIMER_1_MAC #UM_MILI_SEG
-			and.b		#BIT3 | BIT2 | BIT1 | BIT0,R13
-			and.b		#BIT7 | BIT6 | BIT5 | BIT4,0(R14)
-			xor.b	R13,0(R14)
-			mov.b	0(R15),R13
+			push	R15										;salva na pilha
+			push	R14										;salva na pilha
+			push	R13										;salva na pilha
+			mov.w 	8(SP),R15								;Pega o ponteiro para o byte a ser enviado
+			mov.w 	10(SP),R14								;Pega o registrador (GPIO)
+			mov.b	0(R15),R13								;Pega o conteúdo do ponteiro e salva em R13
+			DELAY_TIMER_1_MAC #UM_MILI_SEG					;Aguarda
+			and.b		#BIT3 | BIT2 | BIT1 | BIT0,R13		;Apaga o nibble superior do byte, R13 contém o nibble inicial do byte
+			and.b		#BIT7 | BIT6 | BIT5 | BIT4,0(R14)	;Apaga o nible inferior da GPIO
+			xor.b	R13,0(R14)								;Copia o nibble inferior para a GPIO. (Transmissão de 4 em 4 bits)
+			mov.b	0(R15),R13								;Novamente, Pega o conteúdo do ponteiro e salva em R13
+			rra		R13										;Desloca quatro vezes o bits para esquerda
+			rra		R13										;Desloca os nibble msb para os lsb
 			rra		R13
 			rra		R13
-			rra		R13PUSH
-			rra		R13
-			DELAY_TIMER_1_MAC #UM_MILI_SEG
-			and.b		#BIT3 | BIT2 | BIT1 | BIT0,R13
-			and.b		#BIT7 | BIT6 | BIT5 | BIT4,0(R14)
-			xor.b	R13,0(R14)
+			DELAY_TIMER_1_MAC #UM_MILI_SEG					;aguarda
+			and.b		#BIT3 | BIT2 | BIT1 | BIT0,R13		;Apaga o nibble superior do byte, R13 contém o nibble inicial do byte
+			and.b		#BIT7 | BIT6 | BIT5 | BIT4,0(R14)	;Apaga o nible inferior da GPIO
+			xor.b	R13,0(R14)								;Copia o nibble inferior para a GPIO. (Transmissão de 4 em 4 bits)
 
-			pop 	R13
-			pop 	R14
-			pop		R15
+			pop 	R13										;restaura da pilha
+			pop 	R14										;restaura da pilha
+			pop		R15										;restaura da pilha
 			ret
 
 
@@ -117,23 +138,30 @@ INICIAR_LCD
 			push	R13
 
 			;mov.w 	10(SP),R15
-			mov.w 	12(SP),R15
-			mov.w 	16(SP),R14
-			mov.w 	18(SP),R13
+			mov.w 	12(SP),R15							;Pega Porta Enable Ex. 2.1
+			mov.w 	16(SP),R14							;Pega Porta RS Ex. 2.5
+			mov.w 	8(SP),R13							;Portas DB4,DB5,DB6,DB7 Ex. 4.0 a 4.3
 
-			bic.b	10(SP),0(R14)		;Desliga RS
-			mov.b	BIT0 | BIT1,0(R13)	;envia 0x03 para o lcd
+			bic.b	14(SP),0(R14)						;Desliga RS, 14(SP = BIT ENABLE
+			mov.b	#BIT0 | BIT1,0(R13)					;envia 0x03 para o lcd, Portas DB4,DB5,DB6,DB7
 
-			PULSO_MAC #P2OUT			;envia pulso
+			PULSO_MAC #P2OUT,#BIT1						;envia pulso
 
-			DELAY_TIMER_1_MAC ;colocar 5milis
+			DELAY_TIMER_1_MAC #CINCO_MILI_SEG			;Aguarda 5ms
 
-			PULSO_MAC #P2OUT			;envia pulso
+			PULSO_MAC #P2OUT,#BIT1						;envia pulso
 
-			DELAY_TIMER_1_MAC ;colocar 1milis
+			DELAY_TIMER_1_MAC #UM_MILI_SEG				;Aguarda 1ms
 
-			PULSO_MAC #P2OUT			;envia pulso
+			PULSO_MAC #P2OUT,#BIT1						;envia pulso
 
+			ENV_BYTE_TO_LCD_MAC	#P2OUT,	#CONF_LCD				;configura Lcd
+			ENV_BYTE_TO_LCD_MAC	#P2OUT,	#DISPLAY_OFF			;desliga display
+			ENV_BYTE_TO_LCD_MAC	#P2OUT,	#DISPLAY_CLEAR			;limpa display
+			ENV_BYTE_TO_LCD_MAC	#P2OUT,	#MODE_SET				;configura (?)
+			ENV_BYTE_TO_LCD_MAC	#P2OUT,	#F						;configura (?)
+
+			pop		R13
 			pop 	R14
 			pop		R15
 
