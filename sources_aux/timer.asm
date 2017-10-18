@@ -31,3 +31,10 @@ INICIAR_LCD_MC			.macro	PORTA_RS,	BIT_RS,	PORT_ENABLE,	BIT_ENABLE,	BUFFER_DADOS
 							call	#INICIAR_LCD
 							add		#8,SP
 						.endm
+
+SET_COMANDO_MAC			.macro	REGISTRADOR,PINO
+						push	REGISTRADOR
+						push	PINO
+						call	#SET_COMANDO
+						add		#4,SP
+						.endm

@@ -7,19 +7,29 @@
             .include	timer.asm
             .define	32,	UM_MILI_SEG
             .eval	32 * 5, CINCO_MILI_SEG
+            .eval	32 * 15, QUINZE_MILI_SEG
+            .define	"bis.b	#BIT1,P2OUT",ENABLE_H
+            .define	"bic.b	#BIT1,P2OUT",ENABLE_L
+            .define	"bis.b	#BIT5,P2OUT",RS_H
+            .define	"bic.b	#BIT5,P2OUT",RS_L
             
+
 ;-------------------------------------------------------------------------------
             .def    RESET                   ; Export program entry-point to
                                             ; make it known to linker.
 ;-------------------------------------------------------------------------------
 			.data
-MSG			.byte	'a'
-CONF_LCD	.byte	0x28
-DISPLAY_OFF	.byte	0x08
-DISPLAY_CLEAR
+MSG			.byte	0X41
+SET_NUM_LINHAS_E_TAM_FONTE
+			.byte	0x28
+SET_DISPLAY_OFF	.byte	0x08
+SET_DISPLAY_CLEAR
 			.byte	0x01
+SET_CURSOR_MV_DIR
+			.byte	0x06
 MODE_SET
-F			.byte	0x0F
+SET_SHOW_CURSOR
+			.byte	0x0F
 COMANDO		.byte	0xC0
 
 
@@ -60,6 +70,9 @@ StopWDT     mov.w   #WDTPW|WDTHOLD,&WDTCTL  ; Stop watchdog timer
             ;nop
             ;bis.w   #GIE,SR            				; habilita interrupções mascaráveis
             ;nop
+
+
+            CALL #TESTE
             INICIAR_LCD_MC #P2OUT,#BIT5,#P2OUT,#BIT1,#P4OUT
             bis.b	#BIT5,P2OUT
             MSG_TO_LCD_MAC  #MSG
@@ -79,6 +92,92 @@ LOOP
 
 			jmp	LOOP
 			nop
+
+TESTE
+
+			DELAY_TIMER_1_MAC #QUINZE_MILI_SEG
+			SET_COMANDO_MAC #P2OUT,#BIT5
+			mov.b	#BIT0 | BIT1,P4OUT
+
+			PULSO_MAC #P2OUT, #BIT1
+
+			DELAY_TIMER_1_MAC #CINCO_MILI_SEG
+
+			PULSO_MAC #P2OUT, #BIT1
+
+			DELAY_TIMER_1_MAC #UM_MILI_SEG
+
+
+			PULSO_MAC #P2OUT, #BIT1
+
+			mov.b	#BIT1,P4OUT
+
+			DELAY_TIMER_1_MAC #UM_MILI_SEG
+
+			PULSO_MAC #P2OUT, #BIT1
+
+
+			DELAY_TIMER_1_MAC #UM_MILI_SEG
+
+			ENV_BYTE_TO_LCD_MAC #P4OUT,#SET_NUM_LINHAS_E_TAM_FONTE
+
+			DELAY_TIMER_1_MAC #UM_MILI_SEG
+
+			ENV_BYTE_TO_LCD_MAC #P4OUT,#SET_DISPLAY_OFF
+
+			DELAY_TIMER_1_MAC #UM_MILI_SEG
+
+			ENV_BYTE_TO_LCD_MAC #P4OUT,#SET_DISPLAY_CLEAR
+
+			DELAY_TIMER_1_MAC #UM_MILI_SEG
+
+			ENV_BYTE_TO_LCD_MAC #P4OUT,#SET_CURSOR_MV_DIR
+
+
+			ENV_BYTE_TO_LCD_MAC #P4OUT,#SET_SHOW_CURSOR
+
+			RS_H
+
+
+
+			ENV_BYTE_TO_LCD_MAC #P4OUT,#MSG
+
+			mov.b	#0x4,P4OUT
+
+
+			PULSO_MAC #P2OUT, #BIT1
+
+			DELAY_TIMER_1_MAC #UM_MILI_SEG
+
+
+			mov.b	#0x1,P4OUT
+
+			PULSO_MAC #P2OUT, #BIT1
+			nop
+			ret
+
+
+
+
+
+
+
+
+
+SET_COMANDO
+			push	R15
+			push	R14
+
+			mov		6(SP),R15							;Pino(RS)
+			mov		8(SP),R14							;Porta
+
+			bic.b	R15,0(R14)
+
+			pop R14
+			pop R15
+
+
+
 
 PULSO
 			push	R15									;salva na pilha
@@ -112,19 +211,27 @@ ENVIA_BYTE_TO_LCD
 			mov.w 	8(SP),R15								;Pega o ponteiro para o byte a ser enviado
 			mov.w 	10(SP),R14								;Pega o registrador (GPIO)
 			mov.b	0(R15),R13								;Pega o conteúdo do ponteiro e salva em R13
-			DELAY_TIMER_1_MAC #UM_MILI_SEG					;Aguarda
-			and.b		#BIT3 | BIT2 | BIT1 | BIT0,R13		;Apaga o nibble superior do byte, R13 contém o nibble inicial do byte
-			and.b		#BIT7 | BIT6 | BIT5 | BIT4,0(R14)	;Apaga o nible inferior da GPIO
-			xor.b	R13,0(R14)								;Copia o nibble inferior para a GPIO. (Transmissão de 4 em 4 bits)
-			mov.b	0(R15),R13								;Novamente, Pega o conteúdo do ponteiro e salva em R13
+
 			rra		R13										;Desloca quatro vezes o bits para esquerda
 			rra		R13										;Desloca os nibble msb para os lsb
 			rra		R13
 			rra		R13
-			DELAY_TIMER_1_MAC #UM_MILI_SEG					;aguarda
-			and.b		#BIT3 | BIT2 | BIT1 | BIT0,R13		;Apaga o nibble superior do byte, R13 contém o nibble inicial do byte
-			and.b		#BIT7 | BIT6 | BIT5 | BIT4,0(R14)	;Apaga o nible inferior da GPIO
-			xor.b	R13,0(R14)								;Copia o nibble inferior para a GPIO. (Transmissão de 4 em 4 bits)
+			bic.b	#BIT7 | BIT6 | BIT5 | BIT4,R13		;Apaga o nibble superior do byte, R13 contém o nibble inicial do byte
+			bic.b	#BIT3 | BIT2 | BIT1 | BIT0,0(R14)	;Apaga o nible inferior da GPIO
+			bis.b	R13,0(R14)							;Copia o nibble inferior para a GPIO. (Transmissão de 4 em 4 bits)
+
+			PULSO_MAC #P2OUT, #BIT1
+
+
+			mov.b	0(R15),R13								;Novamente, Pega o conteúdo do ponteiro e salva em R13
+
+			bic.b	#BIT7 | BIT6 | BIT5 | BIT4,R13		;Apaga o nibble superior do byte, R13 contém o nibble inicial do byte
+			bic.b	#BIT3 | BIT2 | BIT1 | BIT0,0(R14)	;Apaga o nible inferior da GPIO
+			bis.b	R13,0(R14)								;Copia o nibble inferior para a GPIO. (Transmissão de 4 em 4 bits)
+
+			PULSO_MAC #P2OUT, #BIT1
+
+
 
 			pop 	R13										;restaura da pilha
 			pop 	R14										;restaura da pilha
@@ -140,32 +247,63 @@ INICIAR_LCD
 			;mov.w 	10(SP),R15
 			mov.w 	12(SP),R15							;Pega Porta Enable Ex. 2.1
 			mov.w 	16(SP),R14							;Pega Porta RS Ex. 2.5
-			mov.w 	8(SP),R13							;Portas DB4,DB5,DB6,DB7 Ex. 4.0 a 4.3
+			mov.w 	8(SP),R13							;Pega portas DB4,DB5,DB6,DB7 Ex. 4.0 a 4.3
 
-			bic.b	14(SP),0(R14)						;Desliga RS, 14(SP = BIT ENABLE
+			;bic.b	14(SP),0(R14)						;Desliga RS, 14(SP = BIT ENABLE
+			;******
+			RS_L
+			ENABLE_L
+			DELAY_TIMER_1_MAC #UM_MILI_SEG					;Aguarda
+
 			mov.b	#BIT0 | BIT1,0(R13)					;envia 0x03 para o lcd, Portas DB4,DB5,DB6,DB7
 
-			PULSO_MAC #P2OUT,#BIT1						;envia pulso
+			ENABLE_H
+			DELAY_TIMER_1_MAC #CINCO_MILI_SEG					;Aguarda
+			ENABLE_L
+			DELAY_TIMER_1_MAC #UM_MILI_SEG					;Aguarda
+			mov.b	#BIT0 | BIT1,0(R13)					;envia 0x03 para o lcd, Portas DB4,DB5,DB6,DB7
 
-			DELAY_TIMER_1_MAC #CINCO_MILI_SEG			;Aguarda 5ms
+			ENABLE_H
+			DELAY_TIMER_1_MAC #CINCO_MILI_SEG					;Aguarda
+			ENABLE_L
+			DELAY_TIMER_1_MAC #UM_MILI_SEG					;Aguarda
+			mov.b	#BIT0 | BIT1,0(R13)					;envia 0x03 para o lcd, Portas DB4,DB5,DB6,DB7
 
-			PULSO_MAC #P2OUT,#BIT1						;envia pulso
+			ENABLE_H
+			DELAY_TIMER_1_MAC #CINCO_MILI_SEG					;Aguarda
+			ENABLE_L
+			DELAY_TIMER_1_MAC #UM_MILI_SEG					;Aguarda
 
-			DELAY_TIMER_1_MAC #UM_MILI_SEG				;Aguarda 1ms
-
-			PULSO_MAC #P2OUT,#BIT1						;envia pulso
-
-			ENV_BYTE_TO_LCD_MAC	#P2OUT,	#CONF_LCD				;configura Lcd
-			ENV_BYTE_TO_LCD_MAC	#P2OUT,	#DISPLAY_OFF			;desliga display
-			ENV_BYTE_TO_LCD_MAC	#P2OUT,	#DISPLAY_CLEAR			;limpa display
+			bic.b	14(SP),0(R14)
+			;ENV_BYTE_TO_LCD_MAC	#P2OUT,	#DISPLAY_OFF			;desliga display
+			;ENV_BYTE_TO_LCD_MAC	#P2OUT,	#DISPLAY_CLEAR			;limpa display
 			ENV_BYTE_TO_LCD_MAC	#P2OUT,	#MODE_SET				;configura (?)
-			ENV_BYTE_TO_LCD_MAC	#P2OUT,	#F						;configura (?)
+;			ENV_BYTE_TO_LCD_MAC	#P2OUT,	#F						;configura (?)
 
 			pop		R13
 			pop 	R14
 			pop		R15
 
 
+CODIGO_INICIALIZACAO
+			mov.b	#BIT0 | BIT1,P4OUT
+
+			PULSO_MAC #P2OUT, #BIT1
+
+			DELAY_TIMER_1_MAC #CINCO_MILI_SEG
+
+			PULSO_MAC #P2OUT, #BIT1
+
+			DELAY_TIMER_1_MAC #UM_MILI_SEG
+
+
+			PULSO_MAC #P2OUT, #BIT1
+
+			mov.b	#BIT1,P4OUT
+
+			DELAY_TIMER_1_MAC #UM_MILI_SEG
+
+			PULSO_MAC #P2OUT, #BIT1
 
 DELAY_TIMER_1
 			bis.w   #CCIE,&TA1CCTL0
