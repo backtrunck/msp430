@@ -10,10 +10,15 @@ PULSO_MAC				.macro		PORTA_ENABLE,	BIT_ENABLE
 							add	#4,SP
 						.endm
 
-MSG_TO_LCD_MAC			.macro	MESSAGEM
-							push	MESSAGEM
+MSG_TO_LCD_MAC			.macro	PORTA_RS, BIT_RS, PORT_ENABLE, BIT_ENABLE, BUFFER_DADOS,MENSAGEM
+							push	PORTA_RS
+							push 	BIT_RS
+							push	PORT_ENABLE
+							push	BIT_ENABLE
+							push	BUFFER_DADOS
+							push	MENSAGEM
 							call	#MSG_TO_LCD
-							add		#2,SP
+							add		#12,SP
 						.endm
 
 ENV_BYTE_TO_LCD_MAC		.macro	REGISTRADOR,BYTE
@@ -29,12 +34,13 @@ INICIAR_LCD_MC			.macro	PORTA_RS,	BIT_RS,	PORT_ENABLE,	BIT_ENABLE,	BUFFER_DADOS
 							push	BIT_ENABLE
 							push	BUFFER_DADOS
 							call	#INICIAR_LCD
-							add		#8,SP
+							add		#10,SP
 						.endm
 
-SET_COMANDO_MAC			.macro	REGISTRADOR,PINO
+SET_COMANDO_MAC			.macro	REGISTRADOR,PINO,ENABLE
 						push	REGISTRADOR
 						push	PINO
+						push	ENABLE
 						call	#SET_COMANDO
-						add		#4,SP
+						add		#6,SP
 						.endm

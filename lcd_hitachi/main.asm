@@ -3,6 +3,7 @@
 ;
 ;
 ;-------------------------------------------------------------------------------
+			.nolist
             .cdecls C,LIST,"msp430.h"       ; Include device header file
             .include	timer.asm
             .define	32,	UM_MILI_SEG
@@ -18,8 +19,9 @@
             .def    RESET                   ; Export program entry-point to
                                             ; make it known to linker.
 ;-------------------------------------------------------------------------------
+			.list
 			.data
-MSG			.byte	0X41
+MSG			.byte	"Teste mundo",0x00
 SET_NUM_LINHAS_E_TAM_FONTE
 			.byte	0x28
 SET_DISPLAY_OFF	.byte	0x08
@@ -72,112 +74,39 @@ StopWDT     mov.w   #WDTPW|WDTHOLD,&WDTCTL  ; Stop watchdog timer
             ;nop
 
 
-            CALL #TESTE
+            ;CALL #TESTE
             INICIAR_LCD_MC #P2OUT,#BIT5,#P2OUT,#BIT1,#P4OUT
-            bis.b	#BIT5,P2OUT
-            MSG_TO_LCD_MAC  #MSG
-            bic.b	#BIT5,P2OUT
-            ENV_BYTE_TO_LCD_MAC #P2OUT,#COMANDO
-            bis.b	#BIT5,P2OUT
-            MSG_TO_LCD_MAC  #MSG
+
+            MSG_TO_LCD_MAC  #P2OUT,#BIT5,#P2OUT,#BIT1,#P4OUT,#MSG
 
 
 ;-------------------------------------------------------------------------------
 ; Main loop here
 ;-------------------------------------------------------------------------------
 LOOP
-			PULSO_MAC #P2OUT,#BIT1
-			MSG_TO_LCD_MAC #MSG
-			INICIAR_LCD_MC #P2OUT,#BIT5,#P2OUT,#BIT1,#P4OUT
+			;PULSO_MAC #P2OUT,#BIT1
+			;MSG_TO_LCD_MAC #MSG
+			;INICIAR_LCD_MC #P2OUT,#BIT5,#P2OUT,#BIT1,#P4OUT
 
 			jmp	LOOP
 			nop
 
-TESTE
+SET_COMANDO												;Habilita modo escrita ou de comando do LCD
+														;Parametros (PORTA_DE_SAIDA,PINO,ENABLE
+			push	R15									;Salva na pilha
+			push	R14									;Salva na pilha
 
-			DELAY_TIMER_1_MAC #QUINZE_MILI_SEG
-			SET_COMANDO_MAC #P2OUT,#BIT5
-			mov.b	#BIT0 | BIT1,P4OUT
+			mov		8(SP),R15							;Pino(RS)
+			mov		10(SP),R14							;Porta
 
-			PULSO_MAC #P2OUT, #BIT1
+			cmp		#0,6(SP)							;Compara ENABLE com 0, se igual vai por modo comando, se for 1 modo escrita de dados
+			jnz		S1
+			bic.b	R15,0(R14)							;Ajusta para modo comando
+			jmp 	S2
+S1			bis.b	R15,0(R14)							;Ajusta para modo escrita
 
-			DELAY_TIMER_1_MAC #CINCO_MILI_SEG
-
-			PULSO_MAC #P2OUT, #BIT1
-
-			DELAY_TIMER_1_MAC #UM_MILI_SEG
-
-
-			PULSO_MAC #P2OUT, #BIT1
-
-			mov.b	#BIT1,P4OUT
-
-			DELAY_TIMER_1_MAC #UM_MILI_SEG
-
-			PULSO_MAC #P2OUT, #BIT1
-
-
-			DELAY_TIMER_1_MAC #UM_MILI_SEG
-
-			ENV_BYTE_TO_LCD_MAC #P4OUT,#SET_NUM_LINHAS_E_TAM_FONTE
-
-			DELAY_TIMER_1_MAC #UM_MILI_SEG
-
-			ENV_BYTE_TO_LCD_MAC #P4OUT,#SET_DISPLAY_OFF
-
-			DELAY_TIMER_1_MAC #UM_MILI_SEG
-
-			ENV_BYTE_TO_LCD_MAC #P4OUT,#SET_DISPLAY_CLEAR
-
-			DELAY_TIMER_1_MAC #UM_MILI_SEG
-
-			ENV_BYTE_TO_LCD_MAC #P4OUT,#SET_CURSOR_MV_DIR
-
-
-			ENV_BYTE_TO_LCD_MAC #P4OUT,#SET_SHOW_CURSOR
-
-			RS_H
-
-
-
-			ENV_BYTE_TO_LCD_MAC #P4OUT,#MSG
-
-			mov.b	#0x4,P4OUT
-
-
-			PULSO_MAC #P2OUT, #BIT1
-
-			DELAY_TIMER_1_MAC #UM_MILI_SEG
-
-
-			mov.b	#0x1,P4OUT
-
-			PULSO_MAC #P2OUT, #BIT1
-			nop
-			ret
-
-
-
-
-
-
-
-
-
-SET_COMANDO
-			push	R15
-			push	R14
-
-			mov		6(SP),R15							;Pino(RS)
-			mov		8(SP),R14							;Porta
-
-			bic.b	R15,0(R14)
-
-			pop R14
+S2			pop R14
 			pop R15
-
-
-
 
 PULSO
 			push	R15									;salva na pilha
@@ -190,19 +119,40 @@ PULSO
 			pop 	R14									;restaura R14
 			pop 	R15									;restaura R15
 			ret
-
 MSG_TO_LCD
 
-			push	R15									;salva na pilha
-			mov.w	4(SP), R15							;Retira da pilha o ponteiro da mensagem a ser enviado
-			cmp.b	#0,0(R15)							;Compara com NULL
-			jz		F_MSG								;Se for NULL, pula
-			ENV_BYTE_TO_LCD_MAC #P2OUT,R15
-			;terminar loop
-F_MSG
-			pop		R15									;restaura da pilha
-			ret
+			push	R15
+			push	R14
+			push	R13
+			push	R12
+			push	R11
+			push	R10
 
+			mov.w	14(SP),R11											;Pega Mensagem para o Lcd
+			mov.w 	16(SP),R13											;Pega portas DB4,DB5,DB6,DB7 Ex. 4.0 a 4.3
+			mov.w	18(SP),R10											;Bit Enable
+			mov.w 	20(SP),R15											;Pega Porta Enable Ex. 2.1
+			mov.w	22(SP),R12											;Pega o valor para ajustar o LCD em modo comando
+			mov.w 	24(SP),R14											;Pega Porta RS Ex. 2.5
+
+
+			SET_COMANDO_MAC	R14,R12,#1									;Seta modo escrita do LCD
+
+
+M1			cmp.b	#0,0(R11)							;Ve se o caracter atual da Mensagem é NULL
+			jz		F_MSG								;Se for NULL, pula (toda a mensagem já foi passada para o lcd)
+
+			ENV_BYTE_TO_LCD_MAC R13,R11
+			inc		R11
+			jmp 	M1
+F_MSG
+			pop		R10									;restaura da pilha
+			pop		R11
+			pop		R12
+			pop		R13
+			pop 	R14
+			pop		R15
+			ret
 
 ENVIA_BYTE_TO_LCD
 			push	R15										;salva na pilha
@@ -231,58 +181,51 @@ ENVIA_BYTE_TO_LCD
 
 			PULSO_MAC #P2OUT, #BIT1
 
-
-
 			pop 	R13										;restaura da pilha
 			pop 	R14										;restaura da pilha
 			pop		R15										;restaura da pilha
 			ret
 
-
 INICIAR_LCD
 			push	R15
 			push	R14
 			push	R13
+			push	R12
 
-			;mov.w 	10(SP),R15
-			mov.w 	12(SP),R15							;Pega Porta Enable Ex. 2.1
-			mov.w 	16(SP),R14							;Pega Porta RS Ex. 2.5
-			mov.w 	8(SP),R13							;Pega portas DB4,DB5,DB6,DB7 Ex. 4.0 a 4.3
+			mov.w 	14(SP),R15											;Pega Porta Enable Ex. 2.1
+			mov.w 	18(SP),R14											;Pega Porta RS Ex. 2.5
+			mov.w 	10(SP),R13											;Pega portas DB4,DB5,DB6,DB7 Ex. 4.0 a 4.3
+			mov.w	16(SP),R12											;Pega o valor para ajustar o LCD em modo comando
 
-			;bic.b	14(SP),0(R14)						;Desliga RS, 14(SP = BIT ENABLE
-			;******
-			RS_L
-			ENABLE_L
-			DELAY_TIMER_1_MAC #UM_MILI_SEG					;Aguarda
 
-			mov.b	#BIT0 | BIT1,0(R13)					;envia 0x03 para o lcd, Portas DB4,DB5,DB6,DB7
+			SET_COMANDO_MAC	R14,R12,#0								;Ajusta para modo comando do lcd
 
-			ENABLE_H
-			DELAY_TIMER_1_MAC #CINCO_MILI_SEG					;Aguarda
-			ENABLE_L
-			DELAY_TIMER_1_MAC #UM_MILI_SEG					;Aguarda
-			mov.b	#BIT0 | BIT1,0(R13)					;envia 0x03 para o lcd, Portas DB4,DB5,DB6,DB7
+			call #CODIGO_INICIALIZACAO									;Passa os códigos de inicialização do LCD
 
-			ENABLE_H
-			DELAY_TIMER_1_MAC #CINCO_MILI_SEG					;Aguarda
-			ENABLE_L
-			DELAY_TIMER_1_MAC #UM_MILI_SEG					;Aguarda
-			mov.b	#BIT0 | BIT1,0(R13)					;envia 0x03 para o lcd, Portas DB4,DB5,DB6,DB7
+			DELAY_TIMER_1_MAC #UM_MILI_SEG								;Aguarda
 
-			ENABLE_H
-			DELAY_TIMER_1_MAC #CINCO_MILI_SEG					;Aguarda
-			ENABLE_L
-			DELAY_TIMER_1_MAC #UM_MILI_SEG					;Aguarda
+			ENV_BYTE_TO_LCD_MAC R13,#SET_NUM_LINHAS_E_TAM_FONTE			;Ajusta o numero de linha e fonte do lcd
 
-			bic.b	14(SP),0(R14)
-			;ENV_BYTE_TO_LCD_MAC	#P2OUT,	#DISPLAY_OFF			;desliga display
-			;ENV_BYTE_TO_LCD_MAC	#P2OUT,	#DISPLAY_CLEAR			;limpa display
-			ENV_BYTE_TO_LCD_MAC	#P2OUT,	#MODE_SET				;configura (?)
-;			ENV_BYTE_TO_LCD_MAC	#P2OUT,	#F						;configura (?)
+			DELAY_TIMER_1_MAC #UM_MILI_SEG								;Aguarda
 
+			ENV_BYTE_TO_LCD_MAC R13,#SET_DISPLAY_OFF					;Desliga Lcd
+
+			DELAY_TIMER_1_MAC #UM_MILI_SEG								;Aguarda
+
+			ENV_BYTE_TO_LCD_MAC R13,#SET_DISPLAY_CLEAR				;Limpa lcd
+
+			DELAY_TIMER_1_MAC #UM_MILI_SEG								;Aguarda
+
+			ENV_BYTE_TO_LCD_MAC R13,#SET_CURSOR_MV_DIR				;Ajusta o movimento do cursor (para direita)
+
+
+			ENV_BYTE_TO_LCD_MAC R13,#SET_SHOW_CURSOR					;Mostra o cursor
+
+			pop		R12
 			pop		R13
 			pop 	R14
 			pop		R15
+			ret
 
 
 CODIGO_INICIALIZACAO
@@ -295,7 +238,6 @@ CODIGO_INICIALIZACAO
 			PULSO_MAC #P2OUT, #BIT1
 
 			DELAY_TIMER_1_MAC #UM_MILI_SEG
-
 
 			PULSO_MAC #P2OUT, #BIT1
 
