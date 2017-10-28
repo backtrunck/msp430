@@ -1,0 +1,42 @@
+
+ENV_BYTE_TO_LCD_MAC		.macro	REGISTRADOR,BYTE
+							push	REGISTRADOR
+							push	BYTE
+							call	#ENVIA_BYTE_TO_LCD
+							add		#4,SP
+						.endm
+
+
+
+ENVIA_BYTE_TO_LCD
+			push	R15										;salva na pilha
+			push	R14										;salva na pilha
+			push	R13										;salva na pilha
+			mov.w 	8(SP),R15								;Pega o ponteiro para o byte a ser enviado
+			mov.w 	10(SP),R14								;Pega o registrador (GPIO)
+			mov.b	0(R15),R13								;Pega o conteúdo do ponteiro e salva em R13
+
+			rra		R13										;Desloca quatro vezes o bits para esquerda
+			rra		R13										;Desloca os nibble msb para os lsb
+			rra		R13
+			rra		R13
+			bic.b	#BIT7 | BIT6 | BIT5 | BIT4,R13		;Apaga o nibble superior do byte, R13 contém o nibble inicial do byte
+			bic.b	#BIT3 | BIT2 | BIT1 | BIT0,0(R14)	;Apaga o nible inferior da GPIO
+			bis.b	R13,0(R14)							;Copia o nibble inferior para a GPIO. (Transmissão de 4 em 4 bits)
+
+			PULSO_MAC #P2OUT, #BIT1
+
+
+			mov.b	0(R15),R13								;Novamente, Pega o conteúdo do ponteiro e salva em R13
+
+			bic.b	#BIT7 | BIT6 | BIT5 | BIT4,R13		;Apaga o nibble superior do byte, R13 contém o nibble inicial do byte
+			bic.b	#BIT3 | BIT2 | BIT1 | BIT0,0(R14)	;Apaga o nible inferior da GPIO
+			bis.b	R13,0(R14)								;Copia o nibble inferior para a GPIO. (Transmissão de 4 em 4 bits)
+
+			PULSO_MAC #P2OUT, #BIT1
+
+			pop 	R13										;restaura da pilha
+			pop 	R14										;restaura da pilha
+			pop		R15										;restaura da pilha
+			ret
+
