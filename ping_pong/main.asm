@@ -214,8 +214,11 @@ BUTTON_JG
 
 
 BUTTON_JG_DIR
+			bic		#BIT5,P1IFG							;Limpa bit indicador de interrupção
 			cmp.b	#1,&EM_PAUSA						;Verifica se o jogo esta pausado
 			jz		F_BUTTON							;Se o jogo estiver pausado. O pressionamento do botão não desconta pontos
+			cmp.b	#SAQUE_JG_ESQ,&ESTADO				;Verifica se esta no saque do jogador da Esquerda
+			jz		F_BUTTON							;Se o jogo estiver no saque do jogador da Esquerda. O pressionamento do botão não desconta pontos
 			bit.b	#BIT0,LEDS							;O jogo não está pausado. Continua. O led mais a direita esta aceso?
 			jz		ERR_JG_DIR							;Se o led da estrema direita não esta ligado. A principio o Jogador errou!
 			cmp.b	#SAQUE_JG_DIR,&ESTADO
@@ -231,8 +234,11 @@ ERR_JG_DIR												;Jogador da direita prescionou botão e o led não estava 
 			call 	#FALHA_JG_DIR						;Como não estava em pausa, nem era o momento do saque do jogador da esquerda. Foi uma falha.
 			reti
 BUTTON_JG_ESQ
+			bic		#BIT6,P1IFG							;Limpa bit indicador de interrupção
 			cmp.b	#1,&EM_PAUSA						;Verifica se o jogo esta pausado
 			jz		F_BUTTON							;Se o jogo estiver pausado. O pressionamento do botão não desconta pontos
+			cmp.b	#SAQUE_JG_DIR,&ESTADO				;Verifica se esta no saque do jogador da Direita
+			jz		F_BUTTON							;Se o jogo estiver no saque do jogador da Direita. O pressionamento do botão não desconta pontos
 			bit.b	#BIT6,LEDS							;O jogo não está pausado. Continua. O led mais a esquerda esta aceso?
 			jz		ERR_JG_ESQ							;Se o led da estrema esquerda não esta ligado. A principio o Jogador errou! Pula,
 			cmp.b	#SAQUE_JG_ESQ,&ESTADO				;Jogador não errou! É um saque?
@@ -247,9 +253,10 @@ ERR_JG_ESQ												;Jogador da esquerda prescionou botão e o led não estava
 			call	#FALHA_JG_ESQ						;Como não estava em pausa, nem era o momento do saque do jogador da direita. Foi uma falha.
 			reti										;sai da interupção
 RETOMA_JOGO												;retoma o jogo, habilita interrupção do timer A0 e muda o estado do jogo para EM_JOGO
-			xor		#CCIE,&TA0CCTL0						;habilita interrupção do Timer A0
+
 			mov.b	#EM_JOGO,&ESTADO					;Muda o estado do jogo
 F_BUTTON
+			xor		#CCIE,&TA0CCTL0						;habilita interrupção do Timer A0
 			reti										;sai da interrupção
 
 PREP_SQ_DIR												;Prepara o saque do jogador da direita
@@ -343,6 +350,15 @@ FALHA_JG_DIR										;Jogador da direita falhou
 
 FALHA_JG_ESQ										;Jogador da esquerdo falhou
 			inc.w	&PONTOS_JQ_DIR					;Aumenta os pontos do jogador da direita
+
+			push	#PLACAR_JG_DIR					;Ponteiro para o que vai ser escrito no LCD. Parametro da função MUDA_PLACAR
+			push	PONTOS_JQ_DIR					;Valor dos pontos do jogador da esquerda. Parametro da função MUDA_PLACAR
+
+			call	#MUDA_PLACAR					;Chama MUDA_PLACAR
+
+			add		#4,SP							;Limpa pilha
+
+
 			call	#PREP_SQ_DIR					;Prepara para o saque do jogador da Direita
 			ret
 
