@@ -23,6 +23,9 @@
             
 			.def	PLACAR_NUM,PONTOS_JQ_DIR,PONTOS_JQ_ESQ,LINHA_1,LINHA_2
 			.def 	ESTADO,EM_PAUSA
+
+			.global valor_serial
+
             .data
 LEDS										;Variável para controlar qua led estará ligado
 			.byte	0x00
@@ -106,15 +109,20 @@ StopWDT     mov.w   #WDTPW|WDTHOLD,&WDTCTL  ; Stop watchdog timer
 ;-------------------------------------------------------------------------------
 ;			Configura o Timer_A, modo continuo
 ;-------------------------------------------------------------------------------
+
 			mov.w   #CCIE,&TA0CCTL0         		; TACCR0 interupção habilitada
             mov.w   #UM_SEG,&TA0CCR0				; Conta até 32767 e gera interrupção
             mov.w   #TASSEL__ACLK+MC__UP,&TA0CTL  	; Usa oscilador ACLK(32.768)pg.15 user guide launch, modo up
 ;-------------------------------------------------------------------------------
 ;			Configura o Timer_A_1, modo continuo, utilizado para o Delay do LCD
 ;-------------------------------------------------------------------------------
+			mov.w	#0,&TA1CCR0							;Para o Timer 1
 			mov.w   #CCIE,&TA1CCTL0         			; TACCR0 interupção habilitada
             ;mov.w   #UM_MILI_SEG,&TA1CCR0				; Interruções em 1 milisegundos
             mov.w   #TASSEL__ACLK+MC__UP,&TA1CTL  		; Usa oscilador ACLK(32.768)pg.15 user guide launch, modo up
+
+
+            mov.w	 #2,&valor_serial
 ;-------------------------------------------------------------------------------
 ;			habilita interrupções mascaráveis
 ;-------------------------------------------------------------------------------
@@ -200,7 +208,9 @@ F_PISCA
 			reti
 
 BUTTON_JG
-			xor		#CCIE,&TA0CCTL0						;Desabilita a interrupção do contador 0. O led que estava aceso ao pressionar
+			;xor		#CCIE,&TA0CCTL0						;Desabilita a interrupção do contador 0. O led que estava aceso ao pressionar
+
+			mov.w   #TASSEL__ACLK+MC__STOP,&TA0CTL  	; Para o Timer (MC_STOP).
 														;fica aceso
 			add		&P1IV,PC							;Desvia a depender do botão pressionado
 			nop											;Vetor 0:sem interrupção
@@ -232,6 +242,11 @@ ERR_JG_DIR												;Jogador da direita prescionou botão e o led não estava 
 			cmp.b	#SAQUE_JG_ESQ,&ESTADO				;Estava no momento do saque do jogador da esquerda? Se sim. Não deve-se considerar uma falha
 			jz		F_BUTTON							;Vai para o fim da rotina
 			call 	#FALHA_JG_DIR						;Como não estava em pausa, nem era o momento do saque do jogador da esquerda. Foi uma falha.
+			mov.w  	#MC__UP,&TA0CTL
+			mov.w   #TASSEL__ACLK+MC__UP,&TA0CTL  	; Usa oscilador ACLK(32.768)pg.15 user guide launch, modo up
+			DELAY_TIMER_1_MAC #QUINZE_MILI_SEG
+			bic		#BIT6,P1IFG
+			bic		#BIT5,P1IFG
 			reti
 BUTTON_JG_ESQ
 			bic		#BIT6,P1IFG							;Limpa bit indicador de interrupção
@@ -251,12 +266,20 @@ ERR_JG_ESQ												;Jogador da esquerda prescionou botão e o led não estava
 			cmp.b	#SAQUE_JG_DIR,&ESTADO				;Estava no momento do saque do jogador da direira? Se sim. Não deve-se considerar uma falha
 			jz		F_BUTTON							;Vai para o fim da rotina
 			call	#FALHA_JG_ESQ						;Como não estava em pausa, nem era o momento do saque do jogador da direita. Foi uma falha.
+			mov.w   #TASSEL__ACLK+MC__UP,&TA0CTL  	; Usa oscilador ACLK(32.768)pg.15 user guide launch, modo up
+			DELAY_TIMER_1_MAC #QUINZE_MILI_SEG
+			bic		#BIT6,P1IFG
+			bic		#BIT5,P1IFG
 			reti										;sai da interupção
 RETOMA_JOGO												;retoma o jogo, habilita interrupção do timer A0 e muda o estado do jogo para EM_JOGO
 
 			mov.b	#EM_JOGO,&ESTADO					;Muda o estado do jogo
 F_BUTTON
-			xor		#CCIE,&TA0CCTL0						;habilita interrupção do Timer A0
+
+			DELAY_TIMER_1_MAC #QUINZE_MILI_SEG
+			bic		#BIT6,P1IFG
+			bic		#BIT5,P1IFG
+			mov.w   #TASSEL__ACLK+MC__UP,&TA0CTL  		; Usa oscilador ACLK(32.768)pg.15 user guide launch, modo up
 			reti										;sai da interrupção
 
 PREP_SQ_DIR												;Prepara o saque do jogador da direita
@@ -340,7 +363,9 @@ FALHA_JG_DIR										;Jogador da direita falhou
 			push	#PLACAR_JG_ESQ					;Ponteiro para o que vai ser escrito no LCD. Parametro da função MUDA_PLACAR
 			push	PONTOS_JQ_ESQ					;Valor dos pontos do jogador da esquerda. Parametro da função MUDA_PLACAR
 
+
 			call	#MUDA_PLACAR					;Chama MUDA_PLACAR
+
 
 			add		#4,SP							;Limpa pilha
 
@@ -354,7 +379,10 @@ FALHA_JG_ESQ										;Jogador da esquerdo falhou
 			push	#PLACAR_JG_DIR					;Ponteiro para o que vai ser escrito no LCD. Parametro da função MUDA_PLACAR
 			push	PONTOS_JQ_DIR					;Valor dos pontos do jogador da esquerda. Parametro da função MUDA_PLACAR
 
+
 			call	#MUDA_PLACAR					;Chama MUDA_PLACAR
+
+
 
 			add		#4,SP							;Limpa pilha
 
@@ -364,9 +392,12 @@ FALHA_JG_ESQ										;Jogador da esquerdo falhou
 
 VELOC_AUMENTAR
 			;rra		&TA0CCR0					;Divide por dois. Dobra a frequência. Retirado.
+			cmp.w		#0x1A00,&TA0CCR0					;Se a frequencia estiver em 4,923hz(período de 0,203125s), para de diminuir
+			jz		V_1
 			sub		#0x600,&TA0CCR0					;Diminui o valor. Aumentando a frequencia em 0x600h
 			;jn		NEGATIVO
-			ret
+V_1			ret
+
 NEGATIVO
 			mov.w	#0x600,&TA0CCR0
 			ret
@@ -375,11 +406,16 @@ MUDA_PLACAR
 			push	R15
 			push	R14
 
+			push 	R12
+			push	R11
+			push	R10
+			push	R9
 
-			mov.w	6(SP),R15			;Valor do Placar
-			mov.w	8(SP),R14			;Valor a ser escrito no LCD, 000 a 999 (3 bytes)
+			mov.w	14(SP),R15					;Valor do Placar
+			mov.w	16(SP),R14					;Ponteiro para o buffer que vai ser escrito no LCD, 000 a 999 (3 bytes)
+												;PLACAR_NUM vetor temporário que irá armazenar o placar do jogador
 
-			mov.w	#0,R12
+			mov.w	#0,R12						;indice para o vetor PLACAR_NUM
 			mov.b	#0x30,PLACAR_NUM(R12)		;Coloca zero nos 3 bytes do placar para iniciar
 			inc.w	R12
 			mov.b	#0x30,PLACAR_NUM(R12)		;Coloca zero nos 3 bytes do placar para iniciar
@@ -387,29 +423,39 @@ MUDA_PLACAR
 			mov.b	#0x30,PLACAR_NUM(R12)		;Coloca zero nos 3 bytes do placar para iniciar
 
 
-			mov.w	#1,R12				;R12 vai ser o contador
+			mov.w	#1,R12						;R12 vai ser o contador
 
-			mov.w	#2,R11				;R11 poteiro para o valor que vai ser escrito no LCD
-										;inicia apontando para a casa das unidades, depois para as dezenas, depois centenas
+			mov.w	#2,R11						;R11 vai ser o indice para PLACAR_NUM
+			mov.w	#0x30,R9					;Armazenará o algarimo da centena
+
+												;inicia apontando para a casa das unidades, depois para as dezenas, depois centenas
 
 
 
-M0			cmp.w	#0,R15				;se for zero não faz nada
-			jz		MUDA_FIM			;pula se for zero
+M0			cmp.w	#0,R15						;Se o placar atual do jogador (R15) for 0, pula para o final
+			jz		MUDA_FIM					;pula se for zero
 
-			mov.w	R12,R10
-			add.w	#0x30,R10			;R10 contém o caracter do número atual
-
-			mov.b	R10,PLACAR_NUM(R11)		;copia o número atual para memória
-
-			dec.w	R15					;para controle do loop, roda tantas vezes qt for o valor do placar
-			inc.w	R12					;para controle do caracter a ser impresso
-
-			cmp.w	#10,R12				;aqui muda de unidade para dezenas e centenas
+			cmp.w	#10,R12						;aqui muda de unidade para dezenas e centenas
 			jnz		M1
-			mov.w	#0,R12
-			inc.w	R11
+			mov.w	#1,R12
+			dec.b	R11
+			inc.b	R9
+			mov.b	R9,PLACAR_NUM(R11)
+			inc.b	R11
+			mov.b	#0x30,PLACAR_NUM(R11)
+			dec.w	R15
+			jmp 	M0
+
+			;dec.w	R11
 M1
+			mov.w	R12,R10						;Armazena temporáriamente o contador em R10
+			add.w	#0x30,R10					;Soma R10 (contador) com 0x30(codigo ASCII de "0"),R10 contém o codigo asscii do número atual
+
+			mov.b	R10,PLACAR_NUM(R11)			;Copia o número do placar para o vetor PLACAR_NUM, na posição da unidades.
+
+			dec.w	R15							;para controle do loop, roda tantas vezes qt for o valor do placar
+			inc.w	R12							;para controle do caracter a ser impresso (unidades)
+
 			jmp 	M0
 MUDA_FIM
 
@@ -428,16 +474,19 @@ MUDA_FIM
 			;mov.b	#0,&COOR_Y_LCD
 			;PRINT_LCD_X_Y_MAC #P2OUT,#BIT5,#P2OUT,#BIT1,#P4OUT,#LINHA_2,#COOR_X_LCD,#COOR_Y_LCD
 
-
+			pop 	R9
+			pop		R10
+			pop		R11
+			pop		R12
 			pop		R14
 			pop		R15
 
 			ret
 
 TRATA_TIMER1_A0
+			bic.w	#LPM3, SR
 			bic.w 	#LPM3,0(SP)
-
-			bic.w	#CCIE,&TA1CCTL0
+			;bic.w	#CCIE,&TA1CCTL0
 
 			reti
 

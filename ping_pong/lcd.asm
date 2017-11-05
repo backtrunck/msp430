@@ -3,7 +3,7 @@
 
 		.global	LINHA_1,LINHA_2,MSG,MSG2,SET_NUM_LINHAS_E_TAM_FONTE,SET_DISPLAY_OFF
 		.global	SET_DISPLAY_CLEAR,RETURN_HOME,SET_CURSOR_MV_DIR,SET_CURSOR_MV_ESQ,SET_SHOW_CURSOR,COMANDO,ROLA_TELA_ESQ
-		.def	ENVIA_BYTE_TO_LCD,INICIAR_LCD,MSG_TO_LCD,ENVIA_DADOS_TO_LCD,PRINT_LCD_X_Y
+		.def	ENVIA_BYTE_TO_LCD,INICIAR_LCD,MSG_TO_LCD,ENVIA_DADOS_TO_LCD,PRINT_LCD_X_Y,DELAY_TIMER_1
 
 		.data
 SET_NUM_LINHAS_E_TAM_FONTE					;Comando para configurar numero de linh e tamanho da fonte do lcd
@@ -306,12 +306,25 @@ CODIGO_INICIALIZACAO
 			ret
 
 DELAY_TIMER_1
+			;push	&TA0CCTL0
+			;push	&TA0CCTL1
+			;bic		#CCIE,&TA0CCTL0
+            ;bic		#CCIE,&TA0CCTL1
+
 			bis.w   #CCIE,&TA1CCTL0
+
+
 			mov.w   2(SP),&TA1CCR0
 			nop
 			bis.w	#LPM3 | GIE, SR
 			nop
-			bic.w	#CCIE,&TA1CCTL0
+
+			mov.w	#0,&TA1CCR0					;Para o Timer 1
+			bic.w	#CCIE,&TA1CCTL0				;Desabilita interrupção do Timer 1
+
+			;pop		&TA0CCTL1
+			;pop		&TA0CCTL0
+
 
 			ret
 
