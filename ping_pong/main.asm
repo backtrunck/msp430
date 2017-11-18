@@ -24,7 +24,7 @@
 			.def	PLACAR_NUM,PONTOS_JQ_DIR,PONTOS_JQ_ESQ,LINHA_1,LINHA_2
 			.def 	ESTADO,EM_PAUSA
 
-			.global valor_serial
+			.global ler_serial
 
             .data
 LEDS										;Variável para controlar qua led estará ligado
@@ -122,7 +122,7 @@ StopWDT     mov.w   #WDTPW|WDTHOLD,&WDTCTL  ; Stop watchdog timer
             mov.w   #TASSEL__ACLK+MC__UP,&TA1CTL  		; Usa oscilador ACLK(32.768)pg.15 user guide launch, modo up
 
 
-            mov.w	 #2,&valor_serial
+            calla	#ler_serial
 ;-------------------------------------------------------------------------------
 ;			habilita interrupções mascaráveis
 ;-------------------------------------------------------------------------------
