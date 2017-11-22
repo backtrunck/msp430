@@ -1,6 +1,7 @@
 			.define	32,	UM_MILI_SEG
             .eval	32 * 5, CINCO_MILI_SEG
             .eval	32 * 15, QUINZE_MILI_SEG
+            .eval	32 * 500, DEBOUNCE_TIME
             .eval	32*47/1000,TRINTA_MICRO_SEG
             .define	"bis.b	#BIT1,P2OUT",ENABLE_H
             .define	"bic.b	#BIT1,P2OUT",ENABLE_L
@@ -93,4 +94,4 @@ PRINT_PLACAR_MAC 		.macro		PORTA_RS, BIT_RS, PORT_ENABLE, BIT_ENABLE, BUFFER_DAD
 							add		#12,SP
 						.endm
 
-						.global	ENVIA_BYTE_TO_LCD,INICIAR_LCD,MSG_TO_LCD,PRINT_LCD_X_Y,PRINT_PLACAR
+						.global	ENVIA_BYTE_TO_LCD,INICIAR_LCD,MSG_TO_LCD,PRINT_LCD_X_Y,PRINT_PLACAR,DELAY_TIMER_1

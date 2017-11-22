@@ -1,0 +1,61 @@
+MSP430 Assembler Unix v16.9.4 Sun Nov  5 10:06:44 2017
+
+Tools Copyright (c) 2003-2017 Texas Instruments Incorporated
+serial.asm                                                           PAGE    1
+
+       1            ;******************************************************************************
+       2            ;* MSP430 C/C++ Codegen                                      Unix v16.9.4.LTS *
+       3            ;* Date/Time created: Sun Nov  5 10:06:44 2017                                *
+       4            ;******************************************************************************
+       5                    .compiler_opts --abi=eabi --diag_wrap=off --hll_source=on --mem_model:code=large --mem_model:d
+       6            ;       /opt/ti/ccsv7/tools/compiler/ti-cgt-msp430_16.9.4.LTS/bin/opt430 /tmp/TI3t3EYnCzr /tmp/TI3t3VL
+       7 000000               .sect   ".text:ler_serial"
+       8                    .clink
+       9                    .global ler_serial
+      10            
+      11            ;*****************************************************************************
+      12            ;* FUNCTION NAME: ler_serial                                                 *
+      13            ;*                                                                           *
+      14            ;*   Regs Modified     : SP,SR,r12,r13,r14,r15                               *
+      15            ;*   Regs Used         : SP,SR,r12,r13,r14,r15                               *
+      16            ;*   Local Frame Size  : 0 Args + 0 Auto + 0 Save = 0 byte                   *
+      17            ;*****************************************************************************
+      18 000000       ler_serial:
+      19            ;* --------------------------------------------------------------------------*
+      20            ;----------------------------------------------------------------------
+      21            ;   3 | int ler_serial(int i,int j){                                           
+      22            ;----------------------------------------------------------------------
+      23 000000 0CCF          MOVA      r12,r15               ; [] |3| 
+      24 000002 0DCC          MOVA      r13,r12               ; [] |3| 
+      25 000004 0FCD          MOVA      r15,r13               ; [] |3| 
+      26            ;----------------------------------------------------------------------
+      27            ;   6 | j = i * j;                                                             
+      28            ;----------------------------------------------------------------------
+      29 000006 13B0!         CALLA     #__mspabi_mpyi        ; [] |6| 
+         000008 0000 
+      30                                                      ; [] |6| 
+      31            ;----------------------------------------------------------------------
+      32            ;   7 | return 2 * j;                                                          
+      33            ;----------------------------------------------------------------------
+      34 00000a 025C          RLAM.W    #1,r12                ; [] |7| 
+      35 00000c 0110          RETA      ; [] 
+      36                    ; [] 
+      37            ;*****************************************************************************
+      38            ;* UNDEFINED EXTERNAL REFERENCES                                             *
+      39            ;*****************************************************************************
+      40                    .global __mspabi_mpyi
+      41            
+      42            ;******************************************************************************
+      43            ;* BUILD ATTRIBUTES                                                           *
+      44            ;******************************************************************************
+      45                    .battr "TI", Tag_File, 1, Tag_LPM_INFO(1)
+      46                    .battr "TI", Tag_File, 1, Tag_PORTS_INIT_INFO("012345678901ABCDEFGHIJ0000000000000000000000000
+      47                    .battr "TI", Tag_File, 1, Tag_LEA_INFO(1)
+      48                    .battr "TI", Tag_File, 1, Tag_LOCKIO_INFO(1)
+      49                    .battr "TI", Tag_File, 1, Tag_WAITSTATE_INFO(2)
+      50                    .battr "TI", Tag_File, 1, Tag_HW_MPY32_INFO(1)
+      51                    .battr "TI", Tag_File, 1, Tag_HW_MPY_ISR_INFO(1)
+      52                    .battr "TI", Tag_File, 1, Tag_HW_MPY_INLINE_INFO(1)
+      53                    .battr "mspabi", Tag_File, 1, Tag_enum_size(3)
+
+No Assembly Errors, No Assembly Warnings
