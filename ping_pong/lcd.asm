@@ -184,8 +184,6 @@ ENVIA_DADOS_TO_LCD
 			pop		R15										;restaura da pilha
 			ret
 
-
-
 PRINT_PLACAR
 
 			ENV_BYTE_TO_LCD_MAC R15,R11,R13,#SET_DISPLAY_CLEAR			;Limpa lcd

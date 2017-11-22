@@ -1,7 +1,7 @@
 			.define	32,	UM_MILI_SEG
             .eval	32 * 5, CINCO_MILI_SEG
             .eval	32 * 15, QUINZE_MILI_SEG
-            .eval	32 * 15, DEBOUNCE_TIME
+            .eval	32 * 500, DEBOUNCE_TIME
             .eval	32*47/1000,TRINTA_MICRO_SEG
             .define	"bis.b	#BIT1,P2OUT",ENABLE_H
             .define	"bic.b	#BIT1,P2OUT",ENABLE_L

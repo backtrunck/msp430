@@ -8,6 +8,7 @@
 			.define	32768,UM_SEG
 			.eval UM_SEG / 2,MEIO_SEG
 			.eval	32767 * 2,DOIS_SEG
+			.eval	32767 * 5,CINCO_SEG
 			.define	0,PREP_SAQUE
 			.define 1,SAQUE_JG_DIR
 			.define	2,SAQUE_JG_ESQ
@@ -51,6 +52,7 @@ PLACAR_JG_ESQ
 PLACAR_JG_DIR
 			.byte	0x30,0x30,0x30
 			.byte	"   ",0x00
+VITORIA		.byte	0x00
 
 
 ;-------------------------------------------------------------------------------
@@ -122,7 +124,7 @@ StopWDT     mov.w   #WDTPW|WDTHOLD,&WDTCTL  ; Stop watchdog timer
             mov.w   #TASSEL__ACLK+MC__UP,&TA1CTL  		; Usa oscilador ACLK(32.768)pg.15 user guide launch, modo up
 
 
-            calla	#ler_serial
+            ;calla	#ler_serial
 ;-------------------------------------------------------------------------------
 ;			habilita interrupções mascaráveis
 ;-------------------------------------------------------------------------------
@@ -155,20 +157,20 @@ PISCA
 			cmp.b	#EM_JOGO,&ESTADO
 			jz		INICIO
 			reti
-			cmp.b	#SAQUE_JG_ESQ,&ESTADO
-			jz		JG_ESQ_SACA
-			cmp.b	#SAQUE_JG_DIR,&ESTADO
-			jz		JG_DIR_SACA
-JG_ESQ_SACA
-			mov.b	#BIT6,&LEDS
-            mov.b	&LEDS,P9OUT
-            mov.b	#1,DIRECAO
-            reti
-JG_DIR_SACA
- 			mov.b	#BIT0,&LEDS
-            mov.b	&LEDS,P9OUT
-            mov.b	#PARA_ESQ,DIRECAO
-            reti
+;			cmp.b	#SAQUE_JG_ESQ,&ESTADO
+;			jz		JG_ESQ_SACA
+;			cmp.b	#SAQUE_JG_DIR,&ESTADO
+;			jz		JG_DIR_SACA
+;JG_ESQ_SACA
+;			mov.b	#BIT6,&LEDS
+;            mov.b	&LEDS,P9OUT
+;            mov.b	#1,DIRECAO
+;            reti
+;JG_DIR_SACA
+; 			mov.b	#BIT0,&LEDS
+;            mov.b	&LEDS,P9OUT
+;            mov.b	#PARA_ESQ,DIRECAO
+;            reti
 INICIO
 			cmp.b	#PARA_ESQ,DIRECAO					;Verifica se a Direção do acendimento dos leds é para a esquerda
 			jnz		DIR									;Se não for para a Esquerda, então é para a direita
@@ -208,9 +210,8 @@ F_PISCA
 			reti
 
 BUTTON_JG
-			;xor		#CCIE,&TA0CCTL0						;Desabilita a interrupção do contador 0. O led que estava aceso ao pressionar
-
 			mov.w   #TASSEL__ACLK+MC__STOP,&TA0CTL  	; Para o Timer (MC_STOP).
+
 														;fica aceso
 			add		&P1IV,PC							;Desvia a depender do botão pressionado
 			nop											;Vetor 0:sem interrupção
@@ -224,6 +225,7 @@ BUTTON_JG
 
 
 BUTTON_JG_DIR
+			DELAY_TIMER_1_MAC #DEBOUNCE_TIME
 			bic		#BIT5,P1IFG							;Limpa bit indicador de interrupção
 			cmp.b	#1,&EM_PAUSA						;Verifica se o jogo esta pausado
 			jz		F_BUTTON							;Se o jogo estiver pausado. O pressionamento do botão não desconta pontos
@@ -242,13 +244,10 @@ ERR_JG_DIR												;Jogador da direita prescionou botão e o led não estava 
 			cmp.b	#SAQUE_JG_ESQ,&ESTADO				;Estava no momento do saque do jogador da esquerda? Se sim. Não deve-se considerar uma falha
 			jz		F_BUTTON							;Vai para o fim da rotina
 			call 	#FALHA_JG_DIR						;Como não estava em pausa, nem era o momento do saque do jogador da esquerda. Foi uma falha.
-			mov.w  	#MC__UP,&TA0CTL
-			mov.w   #TASSEL__ACLK+MC__UP,&TA0CTL  	; Usa oscilador ACLK(32.768)pg.15 user guide launch, modo up
-			DELAY_TIMER_1_MAC #QUINZE_MILI_SEG
-			bic		#BIT6,P1IFG
-			bic		#BIT5,P1IFG
-			reti
+			jmp		F_BUTTON							;vai para o final da rotina
+
 BUTTON_JG_ESQ
+			DELAY_TIMER_1_MAC #DEBOUNCE_TIME
 			bic		#BIT6,P1IFG							;Limpa bit indicador de interrupção
 			cmp.b	#1,&EM_PAUSA						;Verifica se o jogo esta pausado
 			jz		F_BUTTON							;Se o jogo estiver pausado. O pressionamento do botão não desconta pontos
@@ -266,11 +265,8 @@ ERR_JG_ESQ												;Jogador da esquerda prescionou botão e o led não estava
 			cmp.b	#SAQUE_JG_DIR,&ESTADO				;Estava no momento do saque do jogador da direira? Se sim. Não deve-se considerar uma falha
 			jz		F_BUTTON							;Vai para o fim da rotina
 			call	#FALHA_JG_ESQ						;Como não estava em pausa, nem era o momento do saque do jogador da direita. Foi uma falha.
-			mov.w   #TASSEL__ACLK+MC__UP,&TA0CTL  	; Usa oscilador ACLK(32.768)pg.15 user guide launch, modo up
-			DELAY_TIMER_1_MAC #QUINZE_MILI_SEG
-			bic		#BIT6,P1IFG
-			bic		#BIT5,P1IFG
-			reti										;sai da interupção
+			jmp		F_BUTTON							;vai para o final da rotina
+
 RETOMA_JOGO												;retoma o jogo, habilita interrupção do timer A0 e muda o estado do jogo para EM_JOGO
 
 			mov.b	#EM_JOGO,&ESTADO					;Muda o estado do jogo
@@ -279,8 +275,53 @@ F_BUTTON
 			DELAY_TIMER_1_MAC #QUINZE_MILI_SEG
 			bic		#BIT6,P1IFG
 			bic		#BIT5,P1IFG
-			mov.w   #TASSEL__ACLK+MC__UP,&TA0CTL  		; Usa oscilador ACLK(32.768)pg.15 user guide launch, modo up
+			mov.w   #TASSEL__ACLK+MC__UP,&TA0CTL  		;Retirar pausa do oscilador: fonte ACLK, modo up
 			reti										;sai da interrupção
+
+FALHA_JG_DIR										;Jogador da direita falhou
+			inc.w	&PONTOS_JQ_ESQ					;Aumenta os pontos do jogador da Esquerda
+
+			call 	#VERF_FIM_JOGO
+			cmp.b	#1,&VITORIA
+			jz		F_JG_DIR_REN
+			push	#PLACAR_JG_ESQ					;Ponteiro para o que vai ser escrito no LCD. Parametro da função MUDA_PLACAR
+			push	PONTOS_JQ_ESQ					;Valor dos pontos do jogador da esquerda. Parametro da função MUDA_PLACAR
+			call	#MUDA_PLACAR					;Chama MUDA_PLACAR
+
+			add		#4,SP							;Limpa pilha
+			call	#PREP_SQ_ESQ					;Prepara para o saque do jogador da Esquerda
+			ret
+F_JG_DIR_REN
+			mov.b	#0,&VITORIA
+			call	#REINICIA_PARTIDA
+			call	#PREP_SQ_ESQ					;Prepara para o saque do jogador da Esquerda
+			ret
+PREP_SQ_ESQ											;Prepara o saque do jogador da esquerda
+			mov.b	#SAQUE_JG_ESQ,&ESTADO			;Muda o estado do jogo
+			mov.b	#PARA_DIR,DIRECAO				;Muda a direção (para direita)
+			mov.b	#BIT6,&LEDS						;prepara para ligar o LED da extrema esquerda
+            mov.b	&LEDS,P9OUT						;Ligar o LED da extrema esquerda
+            call	#PAUSA_SQ_LIGAR					;Coloca o jogo em pausa, para o saque
+            ret
+
+FALHA_JG_ESQ										;Jogador da esquerdo falhou
+			inc.w	&PONTOS_JQ_DIR					;Aumenta os pontos do jogador da direita
+
+			call 	#VERF_FIM_JOGO
+			cmp.b	#1,&VITORIA
+			jz		F_JG_ESQ_REN
+
+			push	#PLACAR_JG_DIR					;Ponteiro para o que vai ser escrito no LCD. Parametro da função MUDA_PLACAR
+			push	PONTOS_JQ_DIR					;Valor dos pontos do jogador da esquerda. Parametro da função MUDA_PLACAR
+			call	#MUDA_PLACAR					;Chama MUDA_PLACAR
+			add		#4,SP							;Limpa pilha
+			call	#PREP_SQ_DIR					;Prepara para o saque do jogador da Direita
+			ret
+F_JG_ESQ_REN
+			mov.b	#0,&VITORIA
+			call	#REINICIA_PARTIDA
+			call	#PREP_SQ_DIR					;Prepara para o saque do jogador da Esquerda
+			ret
 
 PREP_SQ_DIR												;Prepara o saque do jogador da direita
 			mov.b	#SAQUE_JG_DIR,&ESTADO				;Muda o estado do jogo
@@ -289,110 +330,40 @@ PREP_SQ_DIR												;Prepara o saque do jogador da direita
             mov.b	&LEDS,P9OUT							;Ligar o LED da extrema direita
             call	#PAUSA_SQ_LIGAR						;Coloca o jogo em pausa, para o saque
         	ret
-PREP_SQ_ESQ												;Prepara o saque do jogador da esquerda
-			mov.b	#SAQUE_JG_ESQ,&ESTADO				;Muda o estado do jogo
-			mov.b	#PARA_DIR,DIRECAO					;Muda a direção (para direita)
-			mov.b	#BIT6,&LEDS							;prepara para ligar o LED da extrema esquerda
-            mov.b	&LEDS,P9OUT							;Ligar o LED da extrema esquerda
-            call	#PAUSA_SQ_LIGAR						;Coloca o jogo em pausa, para o saque
-            ret
+
+;--------------------------------------------------------------------------------------------------------------------------------
+;			Pausa para Saque.
+;--------------------------------------------------------------------------------------------------------------------------------
 
 PAUSA_SQ_LIGAR
-			mov.b	#TMP_PREP_SAQUE,R15
+			mov.b	#TMP_PREP_SAQUE,R15				;Guarda em R15, o tempo que o jogo ficará em pausa
 			nop
 			bic.w   #GIE,SR   						; desabilita interrupções mascaráveis
 			nop
-			bic		#CCIE,&TA0CCTL0
 
-			bic		#BIT5,P1IE
-			bic		#BIT6,P1IE
-			bis		#CCIE,&TA0CCTL1         		; TACCR1 interupção habilitada
-			mov.w	&TA0CCR0,&FREQ_ATUAL
-			mov.w	#UM_SEG,&TA0CCR0
-            mov.w   #UM_SEG,&TA0CCR1				; Contar três segundos e gera interrupção
-            mov.b	#1,&EM_PAUSA
+			bic		#BIT5,P1IE						;desabilita interrupção do botão
+			bic		#BIT6,P1IE						;desabilita interrupção do botão
+			bic		#CCIE,&TA0CCTL0					;Desabilita interrução
+			bis		#CCIE,&TA0CCTL1         		;TACCR1 interupção habilitada
+			mov.w	&TA0CCR0,&FREQ_ATUAL			;Guarda a frequencia atual do jogo
+			mov.w	#UM_SEG,&TA0CCR0				;Nova frequencia para a pausa, led piscará nesta frequencia
+            mov.w   #UM_SEG,&TA0CCR1				;Nova frequencia para a pausa, led piscará nesta frequencia
+            mov.b	#1,&EM_PAUSA					;Estado atual do jogo
             nop
             bis.w   #GIE,SR            				; habilita interrupções mascaráveis
             nop
-
             ret
-
-TA0_HND
-			add		&TA0IV,PC ; Add offset to Jump table
-			RETI ; Vector 0: No interrupt
-			JMP PAUSA_SQ_DELIGAR ; Vector 2: TA0CCR1
-
-PAUSA_SQ_DELIGAR
-			cmp.b   #SAQUE_JG_DIR,&ESTADO
-			jz		PISCA_DIR
-			xor		#BIT6,&LEDS
-			mov.b	&LEDS,P9OUT
-			jmp		PSD_1
-PISCA_DIR
-			xor		#BIT0,&LEDS
-			mov.b	&LEDS,P9OUT
-
-PSD_1		cmp.b	#0,R15
-			jnz		F_TIME
-			nop
-			bic.w   #GIE,SR   						; desabilita interrupções mascaráveis
-			nop
-			mov.b	#0,&EM_PAUSA
-			bic		#BIT5,P1IFG
-			bic		#BIT6,P1IFG
-			bis		#BIT5,P1IE
-			bis		#BIT6,P1IE
-			bis		#CCIE,&TA0CCTL0
-            bic		#CCIE,&TA0CCTL1
-            mov.w	&FREQ_ATUAL,&TA0CCR0
-            mov.w	&FREQ_ATUAL,&TA0CCR1
-
-            nop
-            bis.w   #GIE,SR            				; habilita interrupções mascaráveis
-            nop
-
-            reti
-F_TIME
-			dec.b	R15
-			reti
+;--------------------------------------------------------------------------------------------------------------------------------
+;			Fim - Pause para Saque
+;--------------------------------------------------------------------------------------------------------------------------------
 
 
-FALHA_JG_DIR										;Jogador da direita falhou
-			inc.w	&PONTOS_JQ_ESQ					;Aumenta os pontos do jogador da Esquerda
-
-			push	#PLACAR_JG_ESQ					;Ponteiro para o que vai ser escrito no LCD. Parametro da função MUDA_PLACAR
-			push	PONTOS_JQ_ESQ					;Valor dos pontos do jogador da esquerda. Parametro da função MUDA_PLACAR
-
-
-			call	#MUDA_PLACAR					;Chama MUDA_PLACAR
-
-
-			add		#4,SP							;Limpa pilha
-
-			call	#PREP_SQ_ESQ					;Prepara para o saque do jogador da Esquerda
-
-			ret
-
-FALHA_JG_ESQ										;Jogador da esquerdo falhou
-			inc.w	&PONTOS_JQ_DIR					;Aumenta os pontos do jogador da direita
-
-			push	#PLACAR_JG_DIR					;Ponteiro para o que vai ser escrito no LCD. Parametro da função MUDA_PLACAR
-			push	PONTOS_JQ_DIR					;Valor dos pontos do jogador da esquerda. Parametro da função MUDA_PLACAR
-
-
-			call	#MUDA_PLACAR					;Chama MUDA_PLACAR
-
-
-
-			add		#4,SP							;Limpa pilha
-
-
-			call	#PREP_SQ_DIR					;Prepara para o saque do jogador da Direita
-			ret
-
+;--------------------------------------------------------------------------------------------------------------------------------
+;			Aumenta a velocidade do jogo, após cada rebatida.
+;--------------------------------------------------------------------------------------------------------------------------------
 VELOC_AUMENTAR
 			;rra		&TA0CCR0					;Divide por dois. Dobra a frequência. Retirado.
-			cmp.w		#0x1A00,&TA0CCR0					;Se a frequencia estiver em 4,923hz(período de 0,203125s), para de diminuir
+			cmp.w	#0x1A00,&TA0CCR0				;Se a frequencia estiver em 4,923hz(período de 0,203125s), para de diminuir
 			jz		V_1
 			sub		#0x600,&TA0CCR0					;Diminui o valor. Aumentando a frequencia em 0x600h
 			;jn		NEGATIVO
@@ -401,7 +372,14 @@ V_1			ret
 NEGATIVO
 			mov.w	#0x600,&TA0CCR0
 			ret
+;--------------------------------------------------------------------------------------------------------------------------------
+;			Fim - Aumenta Velocidade
+;--------------------------------------------------------------------------------------------------------------------------------
 
+
+;--------------------------------------------------------------------------------------------------------------------------------
+;			Muda o Placar do Jogo, altera um buffer de memoria onde estão os caracteres a serem impressos no LCD
+;--------------------------------------------------------------------------------------------------------------------------------
 MUDA_PLACAR
 			push	R15
 			push	R14
@@ -416,17 +394,17 @@ MUDA_PLACAR
 												;PLACAR_NUM vetor temporário que irá armazenar o placar do jogador
 
 			mov.w	#0,R12						;indice para o vetor PLACAR_NUM
-			mov.b	#0x30,PLACAR_NUM(R12)		;Coloca zero nos 3 bytes do placar para iniciar
+			mov.b	#0x30,PLACAR_NUM(R12)		;Coloca zero(ASCII) nos 3 bytes do placar para iniciar
 			inc.w	R12
-			mov.b	#0x30,PLACAR_NUM(R12)		;Coloca zero nos 3 bytes do placar para iniciar
+			mov.b	#0x30,PLACAR_NUM(R12)		;Coloca zero (ASCII) nos 3 bytes do placar para iniciar
 			inc.w	R12
-			mov.b	#0x30,PLACAR_NUM(R12)		;Coloca zero nos 3 bytes do placar para iniciar
+			mov.b	#0x30,PLACAR_NUM(R12)		;Coloca zero (ASCII) nos 3 bytes do placar para iniciar
 
 
 			mov.w	#1,R12						;R12 vai ser o contador
 
 			mov.w	#2,R11						;R11 vai ser o indice para PLACAR_NUM
-			mov.w	#0x30,R9					;Armazenará o algarimo da centena
+			mov.w	#0x30,R9					;Armazenará o algarimo da dezena
 
 												;inicia apontando para a casa das unidades, depois para as dezenas, depois centenas
 
@@ -437,13 +415,13 @@ M0			cmp.w	#0,R15						;Se o placar atual do jogador (R15) for 0, pula para o fi
 
 			cmp.w	#10,R12						;aqui muda de unidade para dezenas e centenas
 			jnz		M1
-			mov.w	#1,R12
-			dec.b	R11
-			inc.b	R9
-			mov.b	R9,PLACAR_NUM(R11)
-			inc.b	R11
-			mov.b	#0x30,PLACAR_NUM(R11)
-			dec.w	R15
+			mov.w	#1,R12						;Reinicia o contador
+			dec.b	R11							;R11 aponta para a posicao da dezena
+			inc.b	R9							;Aumenta o algarismo da dezena
+			mov.b	R9,PLACAR_NUM(R11)			;Copia o algarismo para o vetor PLACAR_NUM na posicao das dezenas
+			inc.b	R11							;vai para a posicao das centenas
+			mov.b	#0x30,PLACAR_NUM(R11)		;imprime zero(ascii) na posicao das unidades
+			dec.w	R15							;controle do loop
 			jmp 	M0
 
 			;dec.w	R11
@@ -470,9 +448,6 @@ MUDA_FIM
 
 
 			call	#PRINT_PLACAR
-			;mov.b	#1,&COOR_X_LCD				;Mostra placar no lcd
-			;mov.b	#0,&COOR_Y_LCD
-			;PRINT_LCD_X_Y_MAC #P2OUT,#BIT5,#P2OUT,#BIT1,#P4OUT,#LINHA_2,#COOR_X_LCD,#COOR_Y_LCD
 
 			pop 	R9
 			pop		R10
@@ -482,13 +457,151 @@ MUDA_FIM
 			pop		R15
 
 			ret
+;--------------------------------------------------------------------------------------------------------------------------------
+;			Fim Muda Placar
+;--------------------------------------------------------------------------------------------------------------------------------
 
+
+;--------------------------------------------------------------------------------------------------------------------------------
+;			Verifica se o jogo finalizou. Placares 6x0, 7x1, apartir de 11 com diferença de dois pontos
+;--------------------------------------------------------------------------------------------------------------------------------
+VERF_FIM_JOGO
+			push.w	R15						;salva R15 na pilha
+			push.w	R14						;salva R14 na pilha
+
+			mov.w	#0,R14
+			cmp.w	PONTOS_JQ_ESQ(R14), PONTOS_JQ_DIR(R14)
+			jz		F_VRF					;Caso esteja empatado, pula pro fim.
+			cmp.w	PONTOS_JQ_ESQ(R14), PONTOS_JQ_DIR(R14)
+			jnc		VRF_JG_ESQ				;PONTOS_JQ_DIR menor do que 10? pula.
+			cmp.w	#11,PONTOS_JQ_DIR(R14)	;Verifica se o jogador fez mais de 10 pontos
+			jnc		VRF_6x0_JG_DIR			;PONTOS_JQ_DIR menor do que 10? pula.
+			mov.w	PONTOS_JQ_DIR(R14),R15
+			sub.w	PONTOS_JQ_ESQ(R14),R15	;Subtrai os dois placares, se diferença maior que dois, jogador direita ganhou
+			cmp.w	#2,R15
+			jc		DIR_GANHOU				;diferenção maior que dois,jogador direita ganhou
+VRF_6x0_JG_DIR
+			cmp.w	#6,PONTOS_JQ_DIR(R14)
+			jnz		VRF_7x1_JG_DIR
+			cmp.w	#0,PONTOS_JQ_ESQ(R14)
+			jz		DIR_GANHOU
+VRF_7x1_JG_DIR
+			cmp.w	#7,PONTOS_JQ_DIR(R14)
+			jnz		VRF_JG_ESQ
+			cmp.w	#1,PONTOS_JQ_ESQ(R14)
+			jz		DIR_GANHOU
+VRF_JG_ESQ
+			cmp.w	#11,PONTOS_JQ_ESQ(R14)	;Verifica se o jogador fez mais de 10 pontos
+			jnc		VRF_6x0_JG_ESQ			;PONTOS_JQ_DIR menor do que 10? pula.
+			mov.w	PONTOS_JQ_ESQ(R14),R15
+			sub.w	PONTOS_JQ_DIR(R14),R15	;Subtrai os dois placares, se diferença maior que dois, jogador direita ganhou
+			cmp.w	#2,R15
+			jc		ESQ_GANHOU				;diferenção maior que dois,jogador direita ganhou
+VRF_6x0_JG_ESQ
+			cmp.w	#6,PONTOS_JQ_ESQ(R14)
+			jnz		VRF_7x1_JG_ESQ
+			cmp.w	#0,PONTOS_JQ_DIR(R14)
+			jz		ESQ_GANHOU
+VRF_7x1_JG_ESQ
+			cmp.w	#7,PONTOS_JQ_ESQ(R14)
+			jnz		F_VRF
+			cmp.w	#1,PONTOS_JQ_DIR(R14)
+			jnz		F_VRF
+ESQ_GANHOU
+DIR_GANHOU
+			mov.b	#1,&VITORIA
+F_VRF
+			pop.w 	R14
+			pop.w  	R15
+			ret
+;--------------------------------------------------------------------------------------------------------------------------------
+;			FIM Verifica fim de jogo
+;--------------------------------------------------------------------------------------------------------------------------------
+
+
+;--------------------------------------------------------------------------------------------------------------------------------
+;			Reinicia a Partida
+;--------------------------------------------------------------------------------------------------------------------------------
+REINICIA_PARTIDA
+			push.w	R15
+			mov.w 	#0,R15
+			mov.b	#SAQUE_JG_DIR,&ESTADO				;Muda o estado do jogo
+			mov.b   #0x30,PLACAR_JG_ESQ(R15)
+			mov.b   #0x30,PLACAR_JG_DIR(R15)
+			inc.w	R15
+			mov.b   #0x30,PLACAR_JG_ESQ(R15)
+			mov.b   #0x30,PLACAR_JG_DIR(R15)
+			inc.w	R15
+			mov.b   #0x30,PLACAR_JG_ESQ(R15)
+			mov.b   #0x30,PLACAR_JG_DIR(R15)
+			mov.w	#0,&PONTOS_JQ_DIR
+			mov.w	#0,&PONTOS_JQ_ESQ
+			call	#PRINT_PLACAR
+			pop.w	R15
+			ret
+
+;--------------------------------------------------------------------------------------------------------------------------------
+;			Fim - Reinicia a Partida
+;--------------------------------------------------------------------------------------------------------------------------------
+
+
+;--------------------------------------------------------------------------------------------------------------------------------
+;Tratamento da interrupção do Timer 1
+;--------------------------------------------------------------------------------------------------------------------------------
 TRATA_TIMER1_A0
 			bic.w	#LPM3, SR
 			bic.w 	#LPM3,0(SP)
 			;bic.w	#CCIE,&TA1CCTL0
 
 			reti
+;-------------------------------------- (FIM) Tratamento da interrupção do Timer 1 ----------------------------------------------
+
+
+
+;--------------------------------------------------------------------------------------------------------------------------------
+;Tratamento da interrupção do Timer 0 (demais canais)
+;--------------------------------------------------------------------------------------------------------------------------------
+
+TA0_HND
+			add		&TA0IV,PC ; Add offset to Jump table
+			RETI ; Vector 0: No interrupt
+			JMP PAUSA_SQ_DELIGAR ; Vector 2: TA0CCR1
+
+PAUSA_SQ_DELIGAR
+			cmp.b   #SAQUE_JG_DIR,&ESTADO			;Verifica de quem é o saque
+			jz		PISCA_DIR						;Saque do jogador da direira
+			xor		#BIT6,&LEDS						;Saque do jogador da esquerda, pisca led da extrema esquerda até o estouro do timer
+			mov.b	&LEDS,P9OUT						;Led da extrema esquerda aceso, jogo pronto para saque
+			jmp		PSD_1
+PISCA_DIR
+			xor		#BIT0,&LEDS						;pisca led da extrema direira até o estouro do timer
+			mov.b	&LEDS,P9OUT						;Led da extrema direita aceso, jogo pronto para saque
+
+PSD_1		cmp.b	#0,R15
+			jnz		F_TIME
+			nop
+			bic.w   #GIE,SR   						; desabilita interrupções mascaráveis
+			nop
+			mov.b	#0,&EM_PAUSA					;Retira pausa do jogo
+			bic		#BIT5,P1IFG						;limpa flag de interrupção
+			bic		#BIT6,P1IFG						;limpa flag de interrupção
+			bis		#BIT5,P1IE						;habilita interrupção do botão
+			bis		#BIT6,P1IE						;habilita interrupção do botão
+			bis		#CCIE,&TA0CCTL0					;habilita interrupção
+            bic		#CCIE,&TA0CCTL1					;desabilita interrupção
+            mov.w	&FREQ_ATUAL,&TA0CCR0			;volta a última frequencia do jogo
+            mov.w	&FREQ_ATUAL,&TA0CCR1
+
+            nop
+            bis.w   #GIE,SR            				; habilita interrupções mascaráveis
+            nop
+
+            reti
+F_TIME
+			dec.b	R15								;decrement R15 (quantos segundos o jogo ficará pausado)
+			reti
+
+;---------------------------------(FIM) Tratamento da interrupção do Timer 0 (demais canais)-------------------------------------------
 
 
 
